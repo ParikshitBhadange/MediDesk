@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  RECEPTIONIST
+}
+
+enum ConditionLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  QR
+}
+
+enum MeetingStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  phone         String?
+  specialty     String?
+  role          Role     @default(RECEPTIONIST)
+  resetTokenHash      String?   @unique
+  resetTokenExpiresAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  patientsCreated   Patient[]      @relation("PatientCreatedBy")
+  patientsAssigned  Patient[]      @relation("PatientAssignedDoctor")
+  consultations     Consultation[] @relation("ConsultationDoctor")
+  meetings          Meeting[]      @relation("MeetingDoctor")
+  prescriptions     Prescription[] @relation("PrescriptionDoctor")
+  feesCollected     Fee[]          @relation("FeeCollectedBy")
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model Patient {
+  id             String         @id @default(cuid())
+  name           String
+  contact        String?
+  description    String?
+  conditionLevel ConditionLevel @default(LOW)
+  createdById    String?
+  createdBy      User?          @relation("PatientCreatedBy", fields: [createdById], references: [id])
+  doctorId       String?
+  assignedDoctor User?          @relation("PatientAssignedDoctor", fields: [doctorId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  consultations Consultation[]
+  meetings      Meeting[]
+  prescriptions Prescription[]
+  fees          Fee[]
+
+  @@map("patients")
+}
+
+model Consultation {
+  id                 String   @id @default(cuid())
+  patientId          String
+  patient            Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId           String?
+  doctor             User?    @relation("ConsultationDoctor", fields: [doctorId], references: [id])
+  cause              String?
+  condition          String?
+  disease            String?
+  symptoms           String?
+  patientDescription String?
+  additionalNote     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  meetings      Meeting[]
+  prescriptions Prescription[]
+
+  @@map("consultations")
+}
+
+model Meeting {
+  id             String        @id @default(cuid())
+  title          String        @default("Follow-up")
+  scheduledAt    DateTime
+  status         MeetingStatus @default(PENDING)
+  notes          String?
+  patientId      String
+  patient        Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId       String?
+  doctor         User?         @relation("MeetingDoctor", fields: [doctorId], references: [id])
+  consultationId String?
+  consultation   Consultation? @relation(fields: [consultationId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@map("meetings")
+}
+
+model Prescription {
+  id             String   @id @default(cuid())
+  consultationId String
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  patientId      String
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId       String?
+  doctor         User?    @relation("PrescriptionDoctor", fields: [doctorId], references: [id])
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  items PrescriptionItem[]
+
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id             String       @id @default(cuid())
+  prescriptionId String
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  sequence       Int          @default(1)
+  medicine       String
+  dosage         String?
+  frequency      String?
+  duration       String?
+  instructions   String?
+  createdAt      DateTime     @default(now())
+
+  @@map("prescription_items")
+}
+
+model Fee {
+  id            String        @id @default(cuid())
+  patientId     String
+  patient       Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  amount        Float
+  method        PaymentMethod @default(CASH)
+  description   String?
+  collectedById String?
+  collectedBy   User?         @relation("FeeCollectedBy", fields: [collectedById], references: [id])
+  createdAt     DateTime      @default(now())
+
+  @@map("fees")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String?
+  entityId  String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
