@@ -40,8 +40,14 @@ model User {
   phone         String?
   specialty     String?
   role          Role     @default(RECEPTIONIST)
+
+  otpHash       String?
+  otpExpiresAt  DateTime?
+  otpAttempts   Int       @default(0)
+
   resetTokenHash      String?   @unique
   resetTokenExpiresAt DateTime?
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

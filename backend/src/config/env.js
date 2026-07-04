@@ -18,6 +18,12 @@ const env = {
   aiApiKey: process.env.AI_API_KEY || "",
   aiBaseUrl: process.env.AI_BASE_URL || "https://api.openai.com/v1",
   aiModel: process.env.AI_MODEL || "gpt-4o-mini",
+
+  smtpHost: process.env.SMTP_HOST || "",
+  smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpUser: process.env.SMTP_USER || "",
+  smtpPass: process.env.SMTP_PASS || "",
+  mailFrom: process.env.MAIL_FROM || "HospitalCore <no-reply@hospitalcore.local>",
 };
 
 module.exports = { env };

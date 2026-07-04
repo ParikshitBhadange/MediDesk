@@ -17,9 +17,14 @@ const forgotPasswordSchema = z.object({
   email: z.string().trim().email("Enter a valid email"),
 });
 
+const verifyOtpSchema = z.object({
+  email: z.string().trim().email("Enter a valid email"),
+  otp: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code"),
+});
+
 const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-module.exports = { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema };
+module.exports = { registerSchema, loginSchema, forgotPasswordSchema, verifyOtpSchema, resetPasswordSchema };
