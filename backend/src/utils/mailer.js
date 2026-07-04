@@ -1,25 +1,10 @@
-const nodemailer = require("nodemailer");
 const { env } = require("../config/env");
 const { ApiError } = require("./ApiError");
 
-let transporter;
-
-function getTransporter() {
-  if (!env.smtpHost || !env.smtpUser || !env.smtpPass) {
-    // Fail loudly rather than silently "succeeding" a forgot-password
-    // request that never actually sends anything.
-    throw new ApiError(500, "Email service is not configured");
-  }
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: env.smtpHost,
-      port: env.smtpPort,
-      secure: env.smtpPort === 465, // true for 465 (implicit TLS), false for 587 (STARTTLS)
-      auth: { user: env.smtpUser, pass: env.smtpPass },
-    });
-  }
-  return transporter;
-}
+// Resend's REST API over plain HTTPS. Using this instead of an SMTP socket
+// sidesteps SMTP-port flakiness on free-tier hosts and needs no extra
+// dependency — Node 18+ ships a global fetch().
+const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 function otpEmailHtml(otp, name) {
   return `
@@ -39,13 +24,32 @@ function otpEmailHtml(otp, name) {
 }
 
 async function sendOtpEmail(to, otp, { name } = {}) {
-  await getTransporter().sendMail({
-    from: env.mailFrom,
-    to,
-    subject: "Your HospitalCore password reset code",
-    text: `Your HospitalCore password reset code is ${otp}. It expires in 10 minutes. If you didn't request this, ignore this email.`,
-    html: otpEmailHtml(otp, name),
+  if (!env.resendApiKey) {
+    // Fail loudly rather than silently "succeeding" a forgot-password
+    // request that never actually sends anything.
+    throw new ApiError(500, "Email service is not configured");
+  }
+
+  const response = await fetch(RESEND_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: env.mailFrom,
+      to,
+      subject: "Your MediDesk password reset code",
+      text: `Your MediDesk password reset code is ${otp}. It expires in 10 minutes. If you didn't request this, ignore this email.`,
+      html: otpEmailHtml(otp, name),
+    }),
   });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    console.error("Resend send failed:", response.status, detail);
+    throw new ApiError(502, "Failed to send the verification email. Please try again.");
+  }
 }
 
 module.exports = { sendOtpEmail };
