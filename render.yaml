@@ -1,13 +1,17 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# In Render: New -> Blueprint -> point at this repo. It will detect this file.
 services:
   - type: web
-    name: medidesk-backend
+    name: hospitalcore-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     dockerCommand: node server.js
-    plan: free
+    # backend/Dockerfile is multi-stage with "production" as the final stage,
+    # so a plain `docker build` (no --target) already builds that stage.
+    plan: starter
     region: oregon
-    autoDeploy: true
+    autoDeploy: false  # deploys are triggered only by GitHub Actions after CI passes
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -15,13 +19,13 @@ services:
       - key: PORT
         value: 5000
       - key: DATABASE_URL
-        sync: false
+        sync: false        # set manually in Render dashboard (Neon/Supabase connection string)
       - key: JWT_SECRET
-        sync: false
+        sync: false        # set manually — long random string
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: CLIENT_ORIGIN
-        sync: false        # e.g. https://medidesk.vercel.app
+        sync: false        # set to your Vercel frontend URL, e.g. https://hospitalcore.vercel.app
       - key: AI_API_KEY
         sync: false
       - key: AI_BASE_URL

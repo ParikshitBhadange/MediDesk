@@ -19,4 +19,7 @@ COPY prisma ./prisma
 RUN npx prisma generate
 COPY . .
 EXPOSE 5000
-CMD ["node", "server.js"]
+# Run any pending migrations, then start the server. This means every deploy
+# (pull image -> migrate -> start) ships schema changes automatically —
+# no more running `prisma migrate deploy` by hand from a laptop.
+CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]

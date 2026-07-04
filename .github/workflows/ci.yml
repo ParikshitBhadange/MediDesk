@@ -15,7 +15,7 @@ jobs:
         working-directory: backend
     env:
       NODE_ENV: development
-      DATABASE_URL: "postgresql://user:password@localhost:5432/medidesk_ci"
+      DATABASE_URL: "postgresql://user:password@localhost:5432/hospitalcore_ci"
       JWT_SECRET: "ci-only-placeholder-secret"
       CLIENT_ORIGIN: "http://localhost:5173"
     steps:
@@ -62,3 +62,21 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  deploy:
+    name: Deploy (Render + Vercel)
+    needs: [backend-ci, frontend-ci]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" \
+            && echo "Render deploy triggered" \
+            || (echo "Render deploy hook failed" && exit 1)
+
+      - name: Trigger Vercel deploy
+        run: |
+          curl -sf -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}" \
+            && echo "Vercel deploy triggered" \
+            || (echo "Vercel deploy hook failed" && exit 1)
