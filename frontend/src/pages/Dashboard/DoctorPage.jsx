@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Sparkles, Plus, Trash2, Printer, Share2, ChevronRight, Loader2, FileDown, Edit3, CalendarPlus } from "lucide-react";
+import { Sparkles, Plus, Trash2, Printer, Share2, ChevronRight, Loader2, FileDown, Edit3, CalendarPlus, Eye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,9 +8,11 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, apiErrorMessage } from "@/lib/api";
-import { shareOnWhatsApp, exportToPDF } from "@/lib/export";
+import { shareOnWhatsApp, exportToPDF, exportConsultationReportPDF } from "@/lib/export";
+import { useAuth } from "@/context/AuthContext";
 
 export default function DoctorPage() {
+  const { user } = useAuth();
   const [queue, setQueue] = useState([]);
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -33,6 +35,7 @@ export default function DoctorPage() {
   const [previousConsultations, setPreviousConsultations] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [newItem, setNewItem] = useState({ medicine: "", dosage: "", frequency: "", duration: "", instructions: "" });
+  const [viewingReport, setViewingReport] = useState(null);
 
   const current = queue[currentIndex];
 
@@ -176,6 +179,16 @@ export default function DoctorPage() {
     ]);
   }
 
+  function downloadReportPdf(reportConsultation) {
+    if (!current) return;
+    exportConsultationReportPDF({
+      patientName: current.name,
+      patientContact: current.contact,
+      doctorName: user?.name,
+      consultation: reportConsultation,
+    });
+  }
+
   const upcomingMeetings = useMemo(
     () => [...meetings].sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt)),
     [meetings],
@@ -294,9 +307,8 @@ export default function DoctorPage() {
         <Tabs defaultValue="prescription">
           <TabsList>
             <TabsTrigger value="prescription">Prescription</TabsTrigger>
-            <TabsTrigger value="meetings">Previous meetings</TabsTrigger>
+            <TabsTrigger value="reports">Reports & schedule</TabsTrigger>
             <TabsTrigger value="note">Additional note</TabsTrigger>
-            <TabsTrigger value="calendar">Schedule</TabsTrigger>
           </TabsList>
 
           <TabsContent value="prescription" className="pt-4">
@@ -315,60 +327,173 @@ export default function DoctorPage() {
             </table>
           </TabsContent>
 
-          <TabsContent value="meetings" className="pt-4">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-muted-foreground uppercase border-b">
-                <tr><th className="py-2">Date</th><th>Disease</th><th>Medications</th><th>Notes</th></tr>
-              </thead>
-              <tbody>
-                {previousConsultations.map((m) => {
-                  const items = (m.prescriptions ?? []).flatMap((p) => p.items ?? []);
-                  return (
-                    <tr key={m.id} className="border-b last:border-0">
-                      <td className="py-2">{new Date(m.createdAt).toLocaleDateString()}</td>
-                      <td>{m.disease ?? "—"}</td>
-                      <td>{items.map((i) => `${i.medicine}${i.dosage ? ` (${i.dosage})` : ""}`).join(", ") || "—"}</td>
-                      <td>{m.additionalNote ?? "—"}</td>
-                    </tr>
-                  );
-                })}
-                {previousConsultations.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">No previous meetings</td></tr>}
-              </tbody>
-            </table>
+          <TabsContent value="reports" className="pt-4">
+            <div className="grid lg:grid-cols-2 gap-6">
+              {/* Daily reports — one saved consultation per day, each viewable/downloadable independently */}
+              <div>
+                <h3 className="font-medium text-sm mb-3">Daily reports</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs text-muted-foreground uppercase border-b">
+                      <tr><th className="py-2">Date</th><th>Disease</th><th>Medications</th><th className="text-right">Actions</th></tr>
+                    </thead>
+                    <tbody>
+                      {previousConsultations.map((c) => {
+                        const items = (c.prescriptions ?? []).flatMap((p) => p.items ?? []);
+                        return (
+                          <tr key={c.id} className="border-b last:border-0">
+                            <td className="py-2 whitespace-nowrap">{new Date(c.createdAt).toLocaleDateString()}</td>
+                            <td className="max-w-[140px] truncate">{c.disease ?? "—"}</td>
+                            <td className="max-w-[180px] truncate">
+                              {items.map((i) => i.medicine).join(", ") || "—"}
+                            </td>
+                            <td className="py-2">
+                              <div className="flex justify-end gap-1">
+                                <Button size="icon" variant="ghost" title="View report" onClick={() => setViewingReport(c)}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" title="Download PDF" onClick={() => downloadReportPdf(c)}>
+                                  <FileDown className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {previousConsultations.length === 0 && (
+                        <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">No reports yet</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Meeting schedule — sits beside the reports table */}
+              <div>
+                <h3 className="font-medium text-sm mb-3">Meeting schedule</h3>
+                <ScheduleMeeting
+                  patientId={current?.id}
+                  consultationId={consultation?.id}
+                  onCreated={() => api.get("/doctor/meetings").then(({ data }) => setMeetings(data.data))}
+                />
+                <div className="overflow-x-auto mt-4">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs text-muted-foreground uppercase border-b">
+                      <tr><th className="py-2">When</th><th>Patient</th><th>Title</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      {upcomingMeetings.map((m) => (
+                        <tr key={m.id} className="border-b last:border-0">
+                          <td className="py-2">{new Date(m.scheduledAt).toLocaleString()}</td>
+                          <td>{m.patient?.name ?? "—"}</td>
+                          <td>{m.title}</td>
+                          <td className="capitalize">{m.status?.toLowerCase()}</td>
+                        </tr>
+                      ))}
+                      {upcomingMeetings.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">No meetings scheduled</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="note" className="pt-4">
             <Textarea rows={6} value={additionalNote} onChange={(e) => setAdditionalNote(e.target.value)} placeholder="Additional notes…" />
             <div className="flex justify-end mt-3"><Button size="sm" onClick={saveConsultation}>Save note</Button></div>
           </TabsContent>
-
-          <TabsContent value="calendar" className="pt-4 space-y-4">
-            <ScheduleMeeting
-              patientId={current?.id}
-              consultationId={consultation?.id}
-              onCreated={() => api.get("/doctor/meetings").then(({ data }) => setMeetings(data.data))}
-            />
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground uppercase border-b">
-                  <tr><th className="py-2">When</th><th>Patient</th><th>Title</th><th>Status</th></tr>
-                </thead>
-                <tbody>
-                  {upcomingMeetings.map((m) => (
-                    <tr key={m.id} className="border-b last:border-0">
-                      <td className="py-2">{new Date(m.scheduledAt).toLocaleString()}</td>
-                      <td>{m.patient?.name ?? "—"}</td>
-                      <td>{m.title}</td>
-                      <td className="capitalize">{m.status?.toLowerCase()}</td>
-                    </tr>
-                  ))}
-                  {upcomingMeetings.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">No meetings scheduled</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </TabsContent>
         </Tabs>
       </Card>
+
+      {viewingReport && (
+        <ReportViewModal
+          report={viewingReport}
+          patientName={current?.name}
+          patientContact={current?.contact}
+          doctorName={user?.name}
+          onClose={() => setViewingReport(null)}
+          onDownload={() => downloadReportPdf(viewingReport)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReportViewModal({ report, patientName, patientContact, doctorName, onClose, onDownload }) {
+  const items = (report.prescriptions ?? []).flatMap((p) => p.items ?? []);
+  const fields = [
+    ["Cause", report.cause],
+    ["Condition", report.condition],
+    ["Disease", report.disease],
+    ["Symptoms", report.symptoms],
+    ["Patient description", report.patientDescription],
+    ["Additional notes", report.additionalNote],
+  ].filter(([, value]) => value && String(value).trim());
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div
+        className="bg-background rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between p-5 border-b">
+          <div>
+            <h2 className="font-semibold text-lg">{patientName}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {patientContact ? `${patientContact} · ` : ""}
+              Report from {new Date(report.createdAt).toLocaleDateString()}
+              {doctorName ? ` · Dr. ${doctorName}` : ""}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {fields.length > 0 ? (
+            <div className="space-y-3">
+              {fields.map(([label, value]) => (
+                <div key={label}>
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</div>
+                  <div className="text-sm mt-0.5 whitespace-pre-wrap">{value}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No clinical details recorded for this visit.</p>
+          )}
+
+          <div>
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Medications</div>
+            {items.length > 0 ? (
+              <table className="w-full text-sm border rounded-md overflow-hidden">
+                <thead className="text-left text-xs text-muted-foreground uppercase bg-muted/50">
+                  <tr><th className="py-1.5 px-2">#</th><th className="px-2">Medicine</th><th className="px-2">Dosage</th><th className="px-2">Freq.</th><th className="px-2">Duration</th></tr>
+                </thead>
+                <tbody>
+                  {items.map((i, idx) => (
+                    <tr key={idx} className="border-t">
+                      <td className="py-1.5 px-2">{i.sequence ?? idx + 1}</td>
+                      <td className="px-2">{i.medicine}</td>
+                      <td className="px-2">{i.dosage ?? "—"}</td>
+                      <td className="px-2">{i.frequency ?? "—"}</td>
+                      <td className="px-2">{i.duration ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No medications recorded.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 p-4 border-t">
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+          <Button size="sm" onClick={onDownload}><FileDown className="h-4 w-4 mr-1.5" /> Download PDF</Button>
+        </div>
+      </div>
     </div>
   );
 }

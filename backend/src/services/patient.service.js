@@ -1,5 +1,6 @@
 const { prisma } = require("../config/db");
 const { ApiError } = require("../utils/ApiError");
+const { getDayRange } = require("../utils/dateRange");
 
 const DOCTOR_SELECT = { select: { id: true, name: true, specialty: true } };
 
@@ -8,11 +9,12 @@ async function listPatients({ conditionLevel, search, date }) {
   if (conditionLevel && conditionLevel !== "all") where.conditionLevel = conditionLevel;
   if (search) where.name = { contains: search, mode: "insensitive" };
   if (date) {
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
-    where.createdAt = { gte: start, lte: end };
+    // date is a "YYYY-MM-DD" string from the receptionist's date picker —
+    // getDayRange interprets that as an IST calendar day (fixed offset),
+    // not the server's own OS timezone, so filtering doesn't silently shift
+    // by several hours depending on where this happens to be deployed.
+    const { start, end } = getDayRange(date);
+    where.createdAt = { gte: start, lt: end };
   }
 
   return prisma.patient.findMany({

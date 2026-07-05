@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { api, apiErrorMessage } from "@/lib/api";
 import { exportToPDF, exportToExcel, printHTML } from "@/lib/export";
+import { todayInIST } from "@/lib/utils";
 
 const CONDITION_TONE = { CRITICAL: "destructive", HIGH: "warning", MEDIUM: "accent", LOW: "success" };
 
@@ -19,7 +20,10 @@ export default function ReceptionistPage() {
   const [description, setDescription] = useState("");
   const [level, setLevel] = useState("LOW");
   const [doctorId, setDoctorId] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  // Defaults to TODAY, not "all patients ever" — this was the source of the
+  // "previous days merged with today" symptom: an empty filter shows every
+  // patient regardless of date, which looks like old and new lists merging.
+  const [dateFilter, setDateFilter] = useState(todayInIST());
   const [doctors, setDoctors] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +99,12 @@ export default function ReceptionistPage() {
           <p className="text-sm text-muted-foreground">Register patients, route to doctors, collect fees.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setDateFilter("")}>All dates</Button>
+          <Button variant={dateFilter === todayInIST() ? "default" : "outline"} size="sm" onClick={() => setDateFilter(todayInIST())}>
+            Today
+          </Button>
+          <Button variant={dateFilter === "" ? "default" : "outline"} size="sm" onClick={() => setDateFilter("")}>
+            All dates
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -173,7 +182,9 @@ export default function ReceptionistPage() {
 
           <Card className="p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-medium">Patients {dateFilter && `— ${dateFilter}`}</h2>
+              <h2 className="font-medium">
+                Patients {dateFilter === todayInIST() ? "— Today" : dateFilter ? `— ${dateFilter}` : "— All dates"}
+              </h2>
               <span className="text-xs text-muted-foreground">{patients.length} record(s)</span>
             </div>
             <div className="overflow-x-auto">

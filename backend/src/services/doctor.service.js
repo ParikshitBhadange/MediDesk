@@ -1,31 +1,31 @@
 const { prisma } = require("../config/db");
 const { ApiError } = require("../utils/ApiError");
+const { getDayRange } = require("../utils/dateRange");
 
-// Doctor's queue: patients currently assigned to them, oldest first.
+// Doctor's queue: only patients routed to them TODAY (IST calendar day).
+// Without this filter, every patient ever assigned to this doctor — including
+// ones already treated days ago — would sit in the queue forever, since
+// nothing else ever removes a patient from it.
 async function getQueue(doctorId) {
+  const { start, end } = getDayRange();
   return prisma.patient.findMany({
-    where: { doctorId },
+    where: { doctorId, createdAt: { gte: start, lt: end } },
     orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      name: true,
-      contact: true,
-      description: true,
-      conditionLevel: true,
-    },
+    select: { id: true, name: true, contact: true, description: true, conditionLevel: true, createdAt: true },
   });
 }
 
 // Finds today's in-progress consultation for a patient, or opens a new one.
+// Using the same IST-fixed day boundary as getQueue keeps "today" consistent
+// everywhere, regardless of what timezone the server itself happens to run in.
 async function getOrCreateTodayConsultation(patientId, doctorId) {
   const patient = await prisma.patient.findUnique({ where: { id: patientId } });
   if (!patient) throw new ApiError(404, "Patient not found");
 
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+  const { start, end } = getDayRange();
 
   const existing = await prisma.consultation.findFirst({
-    where: { patientId, createdAt: { gte: start } },
+    where: { patientId, createdAt: { gte: start, lt: end } },
     orderBy: { createdAt: "desc" },
   });
   if (existing) return existing;
@@ -40,9 +40,7 @@ async function updateConsultation(id, data) {
 }
 
 async function getPrescriptionItems(consultationId) {
-  const prescription = await prisma.prescription.findFirst({
-    where: { consultationId },
-  });
+  const prescription = await prisma.prescription.findFirst({ where: { consultationId } });
   if (!prescription) return [];
   return prisma.prescriptionItem.findMany({
     where: { prescriptionId: prescription.id },
@@ -51,30 +49,18 @@ async function getPrescriptionItems(consultationId) {
 }
 
 async function addPrescriptionItem(consultationId, patientId, doctorId, item) {
-  let prescription = await prisma.prescription.findFirst({
-    where: { consultationId },
-  });
+  let prescription = await prisma.prescription.findFirst({ where: { consultationId } });
   if (!prescription) {
     prescription = await prisma.prescription.create({
       data: { consultationId, patientId, doctorId },
     });
   }
 
-  const count = await prisma.prescriptionItem.count({
-    where: { prescriptionId: prescription.id },
-  });
+  const count = await prisma.prescriptionItem.count({ where: { prescriptionId: prescription.id } });
   const { medicine, dosage, frequency, duration, instructions } = item;
 
   return prisma.prescriptionItem.create({
-    data: {
-      prescriptionId: prescription.id,
-      sequence: count + 1,
-      medicine,
-      dosage,
-      frequency,
-      duration,
-      instructions,
-    },
+    data: { prescriptionId: prescription.id, sequence: count + 1, medicine, dosage, frequency, duration, instructions },
   });
 }
 
@@ -90,7 +76,12 @@ async function getPreviousConsultations(patientId) {
     orderBy: { createdAt: "desc" },
     include: {
       prescriptions: {
-        include: { items: { select: { medicine: true, dosage: true } } },
+        include: {
+          items: {
+            select: { medicine: true, dosage: true, frequency: true, duration: true, instructions: true, sequence: true },
+            orderBy: { sequence: "asc" },
+          },
+        },
       },
     },
   });
@@ -110,25 +101,13 @@ async function listDoctorMeetings(doctorId) {
   });
 }
 
-async function scheduleMeeting({
-  patientId,
-  doctorId,
-  title,
-  scheduledAt,
-  consultationId,
-}) {
+async function scheduleMeeting({ patientId, doctorId, title, scheduledAt, consultationId }) {
   const patient = await prisma.patient.findUnique({ where: { id: patientId } });
   if (!patient) throw new ApiError(404, "Patient not found");
   if (!scheduledAt) throw new ApiError(400, "scheduledAt is required");
 
   return prisma.meeting.create({
-    data: {
-      patientId,
-      doctorId,
-      title: title || "Follow-up",
-      scheduledAt: new Date(scheduledAt),
-      consultationId,
-    },
+    data: { patientId, doctorId, title: title || "Follow-up", scheduledAt: new Date(scheduledAt), consultationId },
   });
 }
 
