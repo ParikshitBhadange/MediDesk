@@ -39,15 +39,21 @@ async function sendOtpEmail(to, otp, { name } = {}) {
     body: JSON.stringify({
       from: env.mailFrom,
       to,
-      subject: "Your MediDesk password reset code",
-      text: `Your MediDesk password reset code is ${otp}. It expires in 10 minutes. If you didn't request this, ignore this email.`,
+      // Resend can't send AS your Gmail address (it can only send from a
+      // domain you've verified in Resend's DNS records — gmail.com isn't
+      // yours to verify). reply_to is the real-world workaround: the email
+      // shows as coming from `from`, but hitting "Reply" goes to your inbox.
+      reply_to: env.mailReplyTo || undefined,
+      subject: "Your HospitalCore password reset code",
+      text: `Your HospitalCore password reset code is ${otp}. It expires in 10 minutes. If you didn't request this, ignore this email.`,
       html: otpEmailHtml(otp, name),
     }),
   });
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    console.error("Resend send failed:", response.status, detail);
+    // Logged server-side only — never leaked to the client response.
+    console.error(`Resend send failed (${response.status}):`, detail);
     throw new ApiError(502, "Failed to send the verification email. Please try again.");
   }
 }

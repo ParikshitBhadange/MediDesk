@@ -19,9 +19,9 @@ const env = {
   aiBaseUrl: process.env.AI_BASE_URL || "https://api.openai.com/v1",
   aiModel: process.env.AI_MODEL || "gpt-4o-mini",
 
-  smtpPort: Number(process.env.SMTP_PORT || 587),
-    resendApiKey: process.env.RESEND_API_KEY || "",
+  resendApiKey: process.env.RESEND_API_KEY || "",
   mailFrom: process.env.MAIL_FROM || "onboarding@resend.dev",
+  mailReplyTo: process.env.MAIL_REPLY_TO || "",
 };
 
 module.exports = { env };

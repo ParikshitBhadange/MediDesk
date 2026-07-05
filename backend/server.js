@@ -3,7 +3,7 @@ const { env } = require("./src/config/env");
 const { prisma } = require("./src/config/db");
 
 const server = app.listen(env.port, () => {
-  console.log(`HospitalCore API listening on port ${env.port} [${env.nodeEnv}]`);
+  console.log(`MediDesk API listening on port ${env.port} [${env.nodeEnv}]`);
 });
 
 async function shutdown(signal) {
