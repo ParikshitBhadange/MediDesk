@@ -1,3 +1,7 @@
+# Local development stack only. Production uses:
+#  - Render for the backend (see backend/Dockerfile "production" stage + render.yaml)
+#  - Vercel for the frontend (see frontend/vercel.json)
+#  - A managed Postgres (Neon/Supabase) instead of the "postgres" service below
 services:
   postgres:
     image: postgres:16-alpine

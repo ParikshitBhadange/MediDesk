@@ -4,7 +4,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api
 
 export const api = axios.create({ baseURL: BASE_URL });
 
-const TOKEN_KEY = "hospitalcore_token";
+const TOKEN_KEY = "medidesk_token";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);

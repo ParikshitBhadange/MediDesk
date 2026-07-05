@@ -2,7 +2,7 @@
 # In Render: New -> Blueprint -> point at this repo. It will detect this file.
 services:
   - type: web
-    name: hospitalcore-backend
+    name: medidesk-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
@@ -25,7 +25,7 @@ services:
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: CLIENT_ORIGIN
-        sync: false        # set to your Vercel frontend URL, e.g. https://hospitalcore.vercel.app
+        sync: false        # set to your Vercel frontend URL, e.g. https://medidesk.vercel.app
       - key: AI_API_KEY
         sync: false
       - key: AI_BASE_URL

@@ -9,7 +9,7 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
 function otpEmailHtml(otp, name) {
   return `
   <div style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1f2937;">
-    <h2 style="margin: 0 0 8px; font-size: 20px;">HospitalCore password reset</h2>
+    <h2 style="margin: 0 0 8px; font-size: 20px;">MediDesk password reset</h2>
     <p style="margin: 0 0 24px; color: #4b5563; font-size: 14px;">
       Hi${name ? ` ${name}` : ""}, use the code below to reset your password. It expires in
       <strong>10 minutes</strong>.
@@ -44,8 +44,8 @@ async function sendOtpEmail(to, otp, { name } = {}) {
       // yours to verify). reply_to is the real-world workaround: the email
       // shows as coming from `from`, but hitting "Reply" goes to your inbox.
       reply_to: env.mailReplyTo || undefined,
-      subject: "Your HospitalCore password reset code",
-      text: `Your HospitalCore password reset code is ${otp}. It expires in 10 minutes. If you didn't request this, ignore this email.`,
+      subject: "Your MediDesk password reset code",
+      text: `Your MediDesk password reset code is ${otp}. It expires in 10 minutes. If you didn't request this, ignore this email.`,
       html: otpEmailHtml(otp, name),
     }),
   });

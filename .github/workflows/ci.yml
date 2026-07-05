@@ -15,7 +15,7 @@ jobs:
         working-directory: backend
     env:
       NODE_ENV: development
-      DATABASE_URL: "postgresql://user:password@localhost:5432/hospitalcore_ci"
+      DATABASE_URL: "postgresql://user:password@localhost:5432/medidesk_ci"
       JWT_SECRET: "ci-only-placeholder-secret"
       CLIENT_ORIGIN: "http://localhost:5173"
     steps:

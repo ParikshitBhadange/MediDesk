@@ -1,8 +1,8 @@
 {
-  "name": "hospitalcore-backend",
+  "name": "medidesk-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "HospitalCore API — Express + Prisma + Neon Postgres",
+  "description": "MediDesk API — Express + Prisma + Neon Postgres",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",

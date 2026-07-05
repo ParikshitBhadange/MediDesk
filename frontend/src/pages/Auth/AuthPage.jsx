@@ -140,7 +140,7 @@ export default function AuthPage() {
 
   const titles = {
     signin: ["Sign in", "Enter your credentials to continue"],
-    signup: ["Create your account", "Join HospitalCore in seconds"],
+    signup: ["Create your account", "Join MediDesk in seconds"],
     forgot: {
       request: ["Forgot password", "We'll email you a 6-digit code"],
       verify: ["Enter the code", `Sent to ${email || "your email"} — check spam if it's missing`],
@@ -154,7 +154,7 @@ export default function AuthPage() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <aside className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-primary/90 to-primary text-primary-foreground">
         <div className="flex items-center gap-2 text-lg font-semibold">
-          <HeartPulse className="h-6 w-6" /> HospitalCore
+          <HeartPulse className="h-6 w-6" /> MediDesk
         </div>
         <div className="space-y-4">
           <h1 className="text-4xl font-semibold leading-tight">Care coordination, simplified.</h1>
@@ -163,7 +163,7 @@ export default function AuthPage() {
             whole hospital — from one calm dashboard.
           </p>
         </div>
-        <p className="text-xs text-primary-foreground/60">© {new Date().getFullYear()} HospitalCore</p>
+        <p className="text-xs text-primary-foreground/60">© {new Date().getFullYear()} MediDesk</p>
       </aside>
 
       <main className="flex items-center justify-center p-6">

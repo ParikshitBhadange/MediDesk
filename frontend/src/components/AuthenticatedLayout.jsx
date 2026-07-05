@@ -25,7 +25,7 @@ export default function AuthenticatedLayout() {
       <aside className="hidden md:flex w-60 flex-col border-r bg-sidebar">
         <div className="h-16 flex items-center gap-2 px-5 border-b">
           <HeartPulse className="h-5 w-5 text-primary" />
-          <span className="font-semibold">HospitalCore</span>
+          <span className="font-semibold">MediDesk</span>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems
