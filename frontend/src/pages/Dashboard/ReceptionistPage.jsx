@@ -12,6 +12,7 @@ import { api, apiErrorMessage } from "@/lib/api";
 import { exportToPDF, exportToExcel, printHTML } from "@/lib/export";
 import { todayInIST } from "@/lib/utils";
 
+
 const CONDITION_TONE = { CRITICAL: "destructive", HIGH: "warning", MEDIUM: "accent", LOW: "success" };
 
 export default function ReceptionistPage() {
@@ -96,41 +97,43 @@ export default function ReceptionistPage() {
       <header className="flex items-end justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Reception</h1>
-          <p className="text-sm text-muted-foreground">Register patients, route to doctors, collect fees.</p>
+          <p className="text-sm text-muted-foreground">Register patients and collect fees.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant={dateFilter === todayInIST() ? "default" : "outline"} size="sm" onClick={() => setDateFilter(todayInIST())}>
-            Today
-          </Button>
-          <Button variant={dateFilter === "" ? "default" : "outline"} size="sm" onClick={() => setDateFilter("")}>
-            All dates
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => exportToPDF("Patients", ["Name", "Contact", "Doctor", "Condition", "Registered"], filteredRows)}
-          >
-            <FileDown className="h-4 w-4 mr-1.5" /> PDF
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              exportToExcel(
-                "patients",
-                "Patients",
-                patients.map((p) => ({
-                  Name: p.name,
-                  Contact: p.contact,
-                  Doctor: p.assignedDoctor?.name ?? "",
-                  Condition: p.conditionLevel,
-                  Registered: new Date(p.createdAt).toLocaleString(),
-                })),
-              )
-            }
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Excel
-          </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-2">
+            <Button variant={dateFilter === todayInIST() ? "default" : "outline"} size="sm" onClick={() => setDateFilter(todayInIST())}>
+              Today
+            </Button>
+            <Button variant={dateFilter === "" ? "default" : "outline"} size="sm" onClick={() => setDateFilter("")}>
+              All dates
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToPDF("Patients", ["Name", "Contact", "Doctor", "Condition", "Registered"], filteredRows)}
+            >
+              <FileDown className="h-4 w-4 mr-1.5" /> PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                exportToExcel(
+                  "patients",
+                  "Patients",
+                  patients.map((p) => ({
+                    Name: p.name,
+                    Contact: p.contact,
+                    Doctor: p.assignedDoctor?.name ?? "",
+                    Condition: p.conditionLevel,
+                    Registered: new Date(p.createdAt).toLocaleString(),
+                  })),
+                )
+              }
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Excel
+            </Button>
+          </div>
         </div>
       </header>
 

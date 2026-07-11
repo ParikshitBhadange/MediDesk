@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Sparkles, Plus, Trash2, Printer, Share2, ChevronRight, Loader2, FileDown, Edit3, CalendarPlus, Eye, X } from "lucide-react";
+import { Sparkles, Plus, Trash2, Printer, Share2, ChevronRight, Loader2, FileDown, Edit3, CalendarPlus, Eye, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,9 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, apiErrorMessage } from "@/lib/api";
 import { shareOnWhatsApp, exportToPDF, exportConsultationReportPDF } from "@/lib/export";
 import { useAuth } from "@/context/AuthContext";
+import ReportViewModal from "@/components/ReportViewModal";
+import UserMenu from "@/components/UserMenu";
 
 export default function DoctorPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [queue, setQueue] = useState([]);
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -196,8 +200,11 @@ export default function DoctorPage() {
 
   if (loadingQueue) {
     return (
-      <div className="p-8 flex items-center gap-2 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading queue…
+      <div className="p-8 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading queue…
+        </div>
+        <UserMenu />
       </div>
     );
   }
@@ -205,8 +212,16 @@ export default function DoctorPage() {
   if (queue.length === 0) {
     return (
       <div className="p-8">
-        <h1 className="text-2xl font-semibold">Doctor</h1>
-        <p className="text-muted-foreground mt-2">No patients assigned yet. Reception will route them here.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">Doctor</h1>
+            <p className="text-muted-foreground mt-2">No patients in today queue yet. Reception will route them here.</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/doctor/search")}>
+              <Search className="h-4 w-4 mr-1.5" /> Search a previous patient
+            </Button>
+          </div>
+          <UserMenu />
+        </div>
       </div>
     );
   }
@@ -236,6 +251,7 @@ export default function DoctorPage() {
             <Button size="sm" onClick={() => setCurrentIndex((i) => Math.min(i + 1, queue.length - 1))}>
               Next patient <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
+            <UserMenu />
           </div>
         </div>
         <div className="text-xs text-muted-foreground mt-2">Queue: {currentIndex + 1} / {queue.length}</div>
@@ -415,85 +431,6 @@ export default function DoctorPage() {
           onDownload={() => downloadReportPdf(viewingReport)}
         />
       )}
-    </div>
-  );
-}
-
-function ReportViewModal({ report, patientName, patientContact, doctorName, onClose, onDownload }) {
-  const items = (report.prescriptions ?? []).flatMap((p) => p.items ?? []);
-  const fields = [
-    ["Cause", report.cause],
-    ["Condition", report.condition],
-    ["Disease", report.disease],
-    ["Symptoms", report.symptoms],
-    ["Patient description", report.patientDescription],
-    ["Additional notes", report.additionalNote],
-  ].filter(([, value]) => value && String(value).trim());
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div
-        className="bg-background rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between p-5 border-b">
-          <div>
-            <h2 className="font-semibold text-lg">{patientName}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {patientContact ? `${patientContact} · ` : ""}
-              Report from {new Date(report.createdAt).toLocaleDateString()}
-              {doctorName ? ` · Dr. ${doctorName}` : ""}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          {fields.length > 0 ? (
-            <div className="space-y-3">
-              {fields.map(([label, value]) => (
-                <div key={label}>
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</div>
-                  <div className="text-sm mt-0.5 whitespace-pre-wrap">{value}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No clinical details recorded for this visit.</p>
-          )}
-
-          <div>
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Medications</div>
-            {items.length > 0 ? (
-              <table className="w-full text-sm border rounded-md overflow-hidden">
-                <thead className="text-left text-xs text-muted-foreground uppercase bg-muted/50">
-                  <tr><th className="py-1.5 px-2">#</th><th className="px-2">Medicine</th><th className="px-2">Dosage</th><th className="px-2">Freq.</th><th className="px-2">Duration</th></tr>
-                </thead>
-                <tbody>
-                  {items.map((i, idx) => (
-                    <tr key={idx} className="border-t">
-                      <td className="py-1.5 px-2">{i.sequence ?? idx + 1}</td>
-                      <td className="px-2">{i.medicine}</td>
-                      <td className="px-2">{i.dosage ?? "—"}</td>
-                      <td className="px-2">{i.frequency ?? "—"}</td>
-                      <td className="px-2">{i.duration ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="text-sm text-muted-foreground">No medications recorded.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 p-4 border-t">
-          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
-          <Button size="sm" onClick={onDownload}><FileDown className="h-4 w-4 mr-1.5" /> Download PDF</Button>
-        </div>
-      </div>
     </div>
   );
 }

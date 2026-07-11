@@ -9,7 +9,7 @@ const queue = asyncHandler(async (req, res) => {
 });
 
 const getOrCreateConsultation = asyncHandler(async (req, res) => {
-  const consultation = await doctorService.getOrCreateTodayConsultation(req.params.patientId, req.user.id);
+  const consultation = await doctorService.getOrCreateTodayConsultation(req.params.patientId, req.user.id, req.user.role);
   ok(res, consultation);
 });
 
@@ -35,7 +35,17 @@ const removePrescriptionItem = asyncHandler(async (req, res) => {
 });
 
 const previousConsultations = asyncHandler(async (req, res) => {
-  const data = await doctorService.getPreviousConsultations(req.params.patientId);
+  const data = await doctorService.getPreviousConsultations(req.params.patientId, req.user.id, req.user.role);
+  ok(res, data);
+});
+
+const searchPatients = asyncHandler(async (req, res) => {
+  const data = await doctorService.searchMyPatients(req.user.id, req.query.query, req.user.role);
+  ok(res, data);
+});
+
+const patientDetail = asyncHandler(async (req, res) => {
+  const data = await doctorService.getPatientForDoctor(req.params.patientId, req.user.id, req.user.role);
   ok(res, data);
 });
 
@@ -72,6 +82,8 @@ module.exports = {
   addPrescriptionItem,
   removePrescriptionItem,
   previousConsultations,
+  searchPatients,
+  patientDetail,
   updatePatient,
   meetings,
   scheduleMeeting,

@@ -15,8 +15,10 @@ const router = Router();
 router.use(requireAuth, requireRole("DOCTOR", "ADMIN"));
 
 router.get("/queue", doctorController.queue);
+router.get("/patients/search", doctorController.searchPatients);
 router.get("/patients/:patientId/consultation", doctorController.getOrCreateConsultation);
 router.get("/patients/:patientId/consultations", doctorController.previousConsultations);
+router.get("/patients/:patientId/profile", doctorController.patientDetail);
 router.patch("/patients/:patientId", validate(updatePatientByDoctorSchema), doctorController.updatePatient);
 
 router.patch("/consultations/:id", validate(updateConsultationSchema), doctorController.updateConsultation);

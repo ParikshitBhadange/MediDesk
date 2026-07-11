@@ -6,6 +6,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardPage from "@/pages/Dashboard/DashboardPage";
 import AdminPage from "@/pages/Dashboard/AdminPage";
 import DoctorPage from "@/pages/Dashboard/DoctorPage";
+import DoctorPatientSearch from "@/pages/Dashboard/DoctorPatientSearch";
+import DoctorPatientDetail from "@/pages/Dashboard/DoctorPatientDetail";
 import ReceptionistPage from "@/pages/Dashboard/ReceptionistPage";
 
 function Home() {
@@ -28,6 +30,8 @@ export default function App() {
           </Route>
           <Route element={<ProtectedRoute roles={["DOCTOR", "ADMIN"]} />}>
             <Route path="/doctor" element={<DoctorPage />} />
+            <Route path="/doctor/search" element={<DoctorPatientSearch />} />
+            <Route path="/doctor/search/:patientId" element={<DoctorPatientDetail />} />
           </Route>
           <Route element={<ProtectedRoute roles={["ADMIN"]} />}>
             <Route path="/admin" element={<AdminPage />} />

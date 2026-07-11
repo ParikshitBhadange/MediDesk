@@ -18,9 +18,15 @@ async function getQueue(doctorId) {
 // Finds today's in-progress consultation for a patient, or opens a new one.
 // Using the same IST-fixed day boundary as getQueue keeps "today" consistent
 // everywhere, regardless of what timezone the server itself happens to run in.
-async function getOrCreateTodayConsultation(patientId, doctorId) {
+// Only the doctor this patient is CURRENTLY assigned to (or an admin) may
+// open a consultation for them — otherwise any doctor could start editing
+// another doctor's patient by guessing a patient id.
+async function getOrCreateTodayConsultation(patientId, doctorId, role) {
   const patient = await prisma.patient.findUnique({ where: { id: patientId } });
   if (!patient) throw new ApiError(404, "Patient not found");
+  if (role !== "ADMIN" && patient.doctorId !== doctorId) {
+    throw new ApiError(403, "This patient is not assigned to you");
+  }
 
   const { start, end } = getDayRange();
 
@@ -70,7 +76,24 @@ async function removePrescriptionItem(id) {
   await prisma.prescriptionItem.delete({ where: { id } });
 }
 
-async function getPreviousConsultations(patientId) {
+// "Treated by this doctor" = currently assigned to them, OR they have at
+// least one consultation on record for this patient (covers patients later
+// reassigned to someone else — history should still be visible to whoever
+// actually saw them). Admins can see everyone's records.
+function treatedByCondition(doctorId, role) {
+  if (role === "ADMIN") return {};
+  return { OR: [{ doctorId }, { consultations: { some: { doctorId } } }] };
+}
+
+async function getPreviousConsultations(patientId, doctorId, role) {
+  if (role !== "ADMIN") {
+    const treated = await prisma.patient.findFirst({
+      where: { id: patientId, ...treatedByCondition(doctorId, role) },
+      select: { id: true },
+    });
+    if (!treated) throw new ApiError(403, "You have not treated this patient");
+  }
+
   return prisma.consultation.findMany({
     where: { patientId },
     orderBy: { createdAt: "desc" },
@@ -85,6 +108,59 @@ async function getPreviousConsultations(patientId) {
       },
     },
   });
+}
+
+// Searches every patient this doctor has ever treated — by name, contact
+// number, or the disease recorded on any of their past consultations —
+// for the doctor's "Search patients" page.
+async function searchMyPatients(doctorId, query, role) {
+  const q = (query || "").trim();
+  const digits = q.replace(/\D/g, "");
+  const consultationFilter = role === "ADMIN" ? {} : { doctorId };
+
+  const where = { ...treatedByCondition(doctorId, role) };
+  if (q) {
+    where.AND = [
+      {
+        OR: [
+          { name: { contains: q, mode: "insensitive" } },
+          ...(digits.length >= 3 ? [{ contact: { contains: digits } }] : []),
+          { consultations: { some: { ...consultationFilter, disease: { contains: q, mode: "insensitive" } } } },
+        ],
+      },
+    ];
+  }
+
+  return prisma.patient.findMany({
+    where,
+    orderBy: { name: "asc" },
+    take: 50,
+    select: {
+      id: true,
+      name: true,
+      contact: true,
+      conditionLevel: true,
+      createdAt: true,
+      consultations: {
+        where: consultationFilter,
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { disease: true, createdAt: true },
+      },
+    },
+  });
+}
+
+// Patient basics for the doctor's history/detail page — gated by the same
+// "treated by me" rule so one doctor can't browse another's patients by
+// guessing an id in the URL.
+async function getPatientForDoctor(patientId, doctorId, role) {
+  const patient = await prisma.patient.findFirst({
+    where: { id: patientId, ...treatedByCondition(doctorId, role) },
+    select: { id: true, name: true, contact: true, description: true, conditionLevel: true, createdAt: true },
+  });
+  if (!patient) throw new ApiError(404, "Patient not found");
+  return patient;
 }
 
 async function updatePatientBasics(patientId, data) {
@@ -125,6 +201,8 @@ module.exports = {
   addPrescriptionItem,
   removePrescriptionItem,
   getPreviousConsultations,
+  searchMyPatients,
+  getPatientForDoctor,
   updatePatientBasics,
   listDoctorMeetings,
   scheduleMeeting,
