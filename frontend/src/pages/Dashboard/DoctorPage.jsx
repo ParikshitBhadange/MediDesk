@@ -212,7 +212,7 @@ export default function DoctorPage() {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-semibold">Doctor</h1>
-      <p className="text-muted-foreground mt-2">No patients in today's queue yet. Reception will route them here.</p>
+      <p className="text-muted-foreground mt-2">No patients in today queue yet. Reception will route them here.</p>
       <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/doctor/search")}>
         <Search className="h-4 w-4 mr-1.5" /> Search a previous patient
       </Button>
