@@ -9,7 +9,6 @@ import { api, apiErrorMessage } from "@/lib/api";
 import { exportConsultationReportPDF } from "@/lib/export";
 import { useAuth } from "@/context/AuthContext";
 import ReportViewModal from "@/components/ReportViewModal";
-import UserMenu from "@/components/UserMenu";
 
 const CONDITION_TONE = { CRITICAL: "destructive", HIGH: "warning", MEDIUM: "accent", LOW: "success" };
 
@@ -56,11 +55,8 @@ export default function DoctorPatientDetail() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading patient…
-        </div>
-        <UserMenu />
+      <div className="p-8 flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading patient…
       </div>
     );
   }
@@ -83,7 +79,6 @@ export default function DoctorPatientDetail() {
           </p>
           <div className="mt-2"><Badge tone={CONDITION_TONE[patient.conditionLevel]}>{patient.conditionLevel}</Badge></div>
         </div>
-        <UserMenu />
       </header>
 
       <Card className="p-0 overflow-hidden">

@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { api, apiErrorMessage } from "@/lib/api";
-import UserMenu from "@/components/UserMenu";
 
 const CONDITION_TONE = { CRITICAL: "destructive", HIGH: "warning", MEDIUM: "accent", LOW: "success" };
 
@@ -57,7 +56,6 @@ export default function DoctorPatientSearch() {
           <h1 className="text-2xl font-semibold">Search my patients</h1>
           <p className="text-sm text-muted-foreground">Search by name, disease, or mobile number across every patient you have treated.</p>
         </div>
-        <UserMenu />
       </header>
 
       <Card className="p-4">

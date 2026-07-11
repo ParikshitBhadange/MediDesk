@@ -12,7 +12,7 @@ import { api, apiErrorMessage } from "@/lib/api";
 import { shareOnWhatsApp, exportToPDF, exportConsultationReportPDF } from "@/lib/export";
 import { useAuth } from "@/context/AuthContext";
 import ReportViewModal from "@/components/ReportViewModal";
-import UserMenu from "@/components/UserMenu";
+
 
 export default function DoctorPage() {
   const { user } = useAuth();
@@ -201,30 +201,24 @@ export default function DoctorPage() {
   if (loadingQueue) {
     return (
       <div className="p-8 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-muted-foreground">
+        
           <Loader2 className="h-4 w-4 animate-spin" /> Loading queue…
         </div>
-        <UserMenu />
-      </div>
+    
     );
   }
 
   if (queue.length === 0) {
-    return (
-      <div className="p-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">Doctor</h1>
-            <p className="text-muted-foreground mt-2">No patients in today queue yet. Reception will route them here.</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/doctor/search")}>
-              <Search className="h-4 w-4 mr-1.5" /> Search a previous patient
-            </Button>
-          </div>
-          <UserMenu />
-        </div>
-      </div>
-    );
-  }
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-semibold">Doctor</h1>
+      <p className="text-muted-foreground mt-2">No patients in today's queue yet. Reception will route them here.</p>
+      <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/doctor/search")}>
+        <Search className="h-4 w-4 mr-1.5" /> Search a previous patient
+      </Button>
+    </div>
+  );
+}
 
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-[1500px] mx-auto">
@@ -251,7 +245,6 @@ export default function DoctorPage() {
             <Button size="sm" onClick={() => setCurrentIndex((i) => Math.min(i + 1, queue.length - 1))}>
               Next patient <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
-            <UserMenu />
           </div>
         </div>
         <div className="text-xs text-muted-foreground mt-2">Queue: {currentIndex + 1} / {queue.length}</div>
