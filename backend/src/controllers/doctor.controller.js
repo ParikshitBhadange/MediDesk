@@ -74,6 +74,16 @@ const analyse = asyncHandler(async (req, res) => {
   ok(res, { suggestion });
 });
 
+// Auto-summary shown in the side panel as soon as a patient comes up in the
+// queue: a "first impression" for new patients, or a date-wise recap of
+// past visits for returning ones.
+const aiSummary = asyncHandler(async (req, res) => {
+  const patient = await doctorService.getPatientForDoctor(req.params.patientId, req.user.id, req.user.role);
+  const consultations = await doctorService.getPreviousConsultations(req.params.patientId, req.user.id, req.user.role);
+  const result = await aiService.generatePatientSummary({ patient, consultations });
+  ok(res, result);
+});
+
 module.exports = {
   queue,
   getOrCreateConsultation,
@@ -89,4 +99,5 @@ module.exports = {
   scheduleMeeting,
   updateMeetingStatus,
   analyse,
+  aiSummary,
 };

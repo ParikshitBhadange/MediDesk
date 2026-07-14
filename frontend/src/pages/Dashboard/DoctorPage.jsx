@@ -35,6 +35,9 @@ export default function DoctorPage() {
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [analysing, setAnalysing] = useState(false);
 
+  const [aiPatientSummary, setAiPatientSummary] = useState(null); // { isNew, summary }
+  const [loadingPatientSummary, setLoadingPatientSummary] = useState(false);
+
   const [prescriptions, setPrescriptions] = useState([]);
   const [previousConsultations, setPreviousConsultations] = useState([]);
   const [meetings, setMeetings] = useState([]);
@@ -71,6 +74,33 @@ export default function DoctorPage() {
 
     api.get(`/doctor/patients/${current.id}/consultation`).then(({ data }) => setConsultation(data.data));
     api.get(`/doctor/patients/${current.id}/consultations`).then(({ data }) => setPreviousConsultations(data.data));
+  }, [current?.id]);
+
+  // Auto-runs the moment a patient's name comes up in the queue: a quick
+  // "first impression" for a new patient, or a date-wise recap of past
+  // visits for a returning one. No button click needed.
+  useEffect(() => {
+    if (!current?.id) return;
+    let cancelled = false;
+    setAiPatientSummary(null);
+    setLoadingPatientSummary(true);
+    api
+      .get(`/doctor/patients/${current.id}/ai-summary`)
+      .then(({ data }) => {
+        if (!cancelled) setAiPatientSummary(data.data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        // Don't toast-spam if AI just isn't configured (missing AI_API_KEY) —
+        // the panel itself shows a quiet fallback message for that case.
+        if (err?.response?.status !== 503) toast.error(apiErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPatientSummary(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [current?.id]);
 
   useEffect(() => {
@@ -298,6 +328,41 @@ export default function DoctorPage() {
             <Button variant="outline" size="sm" onClick={generateReport}><FileDown className="h-4 w-4 mr-1.5" /> Report PDF</Button>
             <Button size="sm" onClick={saveConsultation}>Save consultation</Button>
           </div>
+        </Card>
+
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-medium text-sm flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" /> AI Patient Summary
+            </h3>
+            {aiPatientSummary && (
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${
+                  aiPatientSummary.isNew ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
+                }`}
+              >
+                {aiPatientSummary.isNew ? "New patient" : "Returning patient"}
+              </span>
+            )}
+          </div>
+
+          {loadingPatientSummary && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Summarising…
+            </div>
+          )}
+
+          {!loadingPatientSummary && aiPatientSummary?.summary && (
+            <div className="text-xs bg-muted/50 p-3 rounded-md whitespace-pre-wrap max-h-[300px] overflow-auto">
+              {aiPatientSummary.summary}
+            </div>
+          )}
+
+          {!loadingPatientSummary && !aiPatientSummary && (
+            <p className="text-xs text-muted-foreground">
+              AI summary unavailable. Make sure <code>AI_API_KEY</code> is set in the backend <code>.env</code>.
+            </p>
+          )}
         </Card>
 
         <Card className="p-4 space-y-3">
