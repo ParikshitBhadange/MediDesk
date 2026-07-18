@@ -31,18 +31,13 @@ export default function ReceptionistPage() {
   const [description, setDescription] = useState("");
   const [level, setLevel] = useState("LOW");
   const [doctorId, setDoctorId] = useState("");
-  // Defaults to TODAY, not "all patients ever" — this was the source of the
-  // "previous days merged with today" symptom: an empty filter shows every
-  // patient regardless of date, which looks like old and new lists merging.
   const [dateFilter, setDateFilter] = useState(todayInIST());
   const [doctors, setDoctors] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Lifted up so a checkbox click in the patient table and the search box
-  // in the Fees section stay in sync with each other — one source of truth
-  // for "which patient is currently selected for a fee".
+  // Which patient is currently selected in the Fees section's search box.
   const [selectedPatientId, setSelectedPatientId] = useState("");
 
   // Patient ids currently being toggled in/out of the doctor's queue, so the
@@ -75,9 +70,6 @@ export default function ReceptionistPage() {
     loadPatients();
   }, [loadPatients]);
 
-  // If the date filter changes (or the selected patient just isn't in the
-  // list anymore), drop the stale selection rather than silently keeping a
-  // fee form pointed at a patient that's no longer visible.
   useEffect(() => {
     if (selectedPatientId && !patients.some((p) => p.id === selectedPatientId)) {
       setSelectedPatientId("");
@@ -109,17 +101,10 @@ export default function ReceptionistPage() {
     }
   }
 
-  function toggleSelectPatient(patientId, checked) {
-    // Checkbox behaves as a single-select: checking one clears any other,
-    // unchecking the active one clears the selection entirely.
-    setSelectedPatientId(checked ? patientId : "");
-  }
-
   // Independent multi-select: any number of patients can be ticked "sent to
   // doctor" at once. Ticking stamps queuedAt on the backend (now), unticking
   // clears it — the doctor's queue is ordered by that timestamp, so whoever
-  // gets ticked first is seen first (FIFO), regardless of how many other
-  // patients are also ticked or how long the list is.
+  // gets ticked first is seen first (FIFO).
   async function toggleSentToDoctor(patient, checked) {
     setQueueTogglingIds((prev) => new Set(prev).add(patient.id));
     try {
@@ -248,7 +233,6 @@ export default function ReceptionistPage() {
               <table className="w-full text-sm">
                 <thead className="text-left text-muted-foreground text-xs uppercase border-b">
                   <tr>
-                    <th className="py-2 w-8" title="Select for fee collection"></th>
                     <th className="py-2">Name</th>
                     <th className="py-2">Doctor</th>
                     <th className="py-2">Condition</th>
@@ -259,22 +243,12 @@ export default function ReceptionistPage() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={7} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
+                    <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
                   ) : patients.length === 0 ? (
-                    <tr><td colSpan={7} className="py-6 text-center text-muted-foreground">No patients yet</td></tr>
+                    <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">No patients yet</td></tr>
                   ) : (
                     patients.map((p) => (
-                      <tr
-                        key={p.id}
-                        className={`border-b last:border-0 hover:bg-muted/40 ${selectedPatientId === p.id ? "bg-primary/5" : ""}`}
-                      >
-                        <td className="py-2">
-                          <Checkbox
-                            checked={selectedPatientId === p.id}
-                            onCheckedChange={(checked) => toggleSelectPatient(p.id, checked)}
-                            aria-label={`Select ${p.name} for fee collection`}
-                          />
-                        </td>
+                      <tr key={p.id} className="border-b last:border-0 hover:bg-muted/40">
                         <td className="py-2 font-medium">{p.name}</td>
                         <td className="py-2 text-muted-foreground">{p.assignedDoctor?.name ?? "—"}</td>
                         <td className="py-2"><Badge tone={CONDITION_TONE[p.conditionLevel]}>{p.conditionLevel}</Badge></td>
@@ -326,13 +300,12 @@ function FeesModule({ patients, selectedPatientId, onSelectPatient }) {
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId) ?? null;
 
-  // Keep the search box text in sync when the patient was selected via the
-  // checkbox in the table above, rather than typed here directly.
+  // Keep the search box text in sync whenever the selected patient changes
+  // (e.g. after a fee is collected and the selection is cleared).
   useEffect(() => {
     setSearchText(selectedPatient ? selectedPatient.name : "");
   }, [selectedPatient?.id]);
 
-  // Close the results dropdown on outside click.
   useEffect(() => {
     function handleClickOutside(e) {
       if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setSearchOpen(false);
@@ -412,7 +385,7 @@ function FeesModule({ patients, selectedPatientId, onSelectPatient }) {
               onChange={(e) => {
                 setSearchText(e.target.value);
                 setSearchOpen(true);
-                if (selectedPatientId) onSelectPatient(""); // typing invalidates the previous pick
+                if (selectedPatientId) onSelectPatient("");
               }}
             />
             {searchText && (
