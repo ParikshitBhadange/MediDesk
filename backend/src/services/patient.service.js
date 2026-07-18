@@ -15,7 +15,9 @@ async function listPatients({ conditionLevel, search, date }) {
 
   return prisma.patient.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    // Oldest first: a newly registered patient appears at the bottom of the
+    // list, below everyone already there, instead of jumping to the top.
+    orderBy: { createdAt: "asc" },
     include: { assignedDoctor: DOCTOR_SELECT },
   });
 }
@@ -66,12 +68,19 @@ async function updatePatient(id, data) {
 }
 
 // Ticking the "sent to doctor" checkbox stamps queuedAt with the current
-// time; unticking clears it back to null. Doctor.getQueue orders by this
-// timestamp, so whoever gets ticked first is seen first (FIFO) — not
-// whoever was registered first.
-async function setQueueStatus(id, queued) {
+// time; unticking (or the doctor clicking "Next patient") clears it back to
+// null. Doctor.getQueue orders by this timestamp, so whoever gets ticked
+// first is seen first (FIFO) — not whoever was registered first.
+//
+// A doctor may only dequeue/queue their own assigned patients — otherwise
+// any signed-in doctor could clear an arbitrary patient's queue position by
+// guessing/sending an id. Reception and admin are unrestricted.
+async function setQueueStatus(id, queued, requestingUser) {
   const patient = await prisma.patient.findUnique({ where: { id } });
   if (!patient) throw new ApiError(404, "Patient not found");
+  if (requestingUser?.role === "DOCTOR" && patient.doctorId !== requestingUser.id) {
+    throw new ApiError(403, "This patient is not assigned to you");
+  }
 
   return prisma.patient.update({
     where: { id },

@@ -1,8 +1,28 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+// jsPDF, jspdf-autotable, and xlsx are large (jsPDF ~350KB, xlsx ~600KB+
+// minified). They're only ever needed when someone actually clicks an
+// export button, so they're dynamically imported here instead of at the
+// top of the file — that keeps them out of every page's initial bundle
+// and off the critical path for first paint / first load.
+let pdfLibsPromise;
+function loadPdfLibs() {
+  if (!pdfLibsPromise) {
+    pdfLibsPromise = Promise.all([import("jspdf"), import("jspdf-autotable")]).then(
+      ([{ default: jsPDF }, { default: autoTable }]) => ({ jsPDF, autoTable }),
+    );
+  }
+  return pdfLibsPromise;
+}
 
-export function exportToPDF(title, columns, rows) {
+let xlsxPromise;
+function loadXlsx() {
+  if (!xlsxPromise) {
+    xlsxPromise = import("xlsx");
+  }
+  return xlsxPromise;
+}
+
+export async function exportToPDF(title, columns, rows) {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   doc.setFontSize(16);
   doc.text(title, 14, 16);
@@ -21,7 +41,8 @@ export function exportToPDF(title, columns, rows) {
 // A properly formatted single-day consultation report — patient header,
 // clinical fields as labeled sections, then a medications table — rather
 // than a flat key/value dump. Used for the doctor's per-day report downloads.
-export function exportConsultationReportPDF({ patientName, patientContact, doctorName, consultation }) {
+export async function exportConsultationReportPDF({ patientName, patientContact, doctorName, consultation }) {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const marginX = 14;
   let y = 18;
@@ -96,7 +117,8 @@ export function exportConsultationReportPDF({ patientName, patientContact, docto
   doc.save(`Report_${(patientName || "patient").replace(/\s+/g, "_")}_${dateLabel}.pdf`);
 }
 
-export function exportToExcel(filename, sheetName, rows) {
+export async function exportToExcel(filename, sheetName, rows) {
+  const XLSX = await loadXlsx();
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);

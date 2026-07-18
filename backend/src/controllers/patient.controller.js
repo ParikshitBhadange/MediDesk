@@ -22,7 +22,7 @@ const update = asyncHandler(async (req, res) => {
 });
 
 const setQueueStatus = asyncHandler(async (req, res) => {
-  const patient = await patientService.setQueueStatus(req.params.id, req.body.queued);
+  const patient = await patientService.setQueueStatus(req.params.id, req.body.queued, req.user);
   await auditService.logAction({
     userId: req.user.id,
     action: req.body.queued ? "SEND_PATIENT_TO_DOCTOR" : "UNSEND_PATIENT_FROM_DOCTOR",

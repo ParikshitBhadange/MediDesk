@@ -20,7 +20,7 @@ router.post("/", requireRole("RECEPTIONIST", "ADMIN"), validate(createPatientSch
 router.patch("/:id", requireRole("RECEPTIONIST", "ADMIN", "DOCTOR"), validate(updatePatientSchema), patientController.update);
 router.patch(
   "/:id/queue",
-  requireRole("RECEPTIONIST", "ADMIN"),
+  requireRole("RECEPTIONIST", "ADMIN", "DOCTOR"),
   validate(setQueueStatusSchema),
   patientController.setQueueStatus,
 );

@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
+const compression = require("compression");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const { env } = require("./config/env");
@@ -16,6 +17,10 @@ const app = express();
 
 app.set("trust proxy", 1);
 app.use(helmet());
+// Gzip every JSON response — patient/queue lists are the most frequently
+// polled endpoints in the app, and compression cuts their transfer size
+// (and therefore time-to-render) substantially over slower connections.
+app.use(compression());
 app.use(cors({ origin: env.clientOrigin, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));

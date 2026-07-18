@@ -15,6 +15,23 @@ import { todayInIST } from "@/lib/utils";
 
 const CONDITION_TONE = { CRITICAL: "destructive", HIGH: "warning", MEDIUM: "accent", LOW: "success" };
 
+// The doctor list barely ever changes within a shift, so cache it in memory
+// for a few minutes and skip the network round trip on remounts (e.g.
+// navigating away to the Doctor dashboard and back) — one less request
+// blocking the page before it's usable.
+let doctorsCache = null;
+let doctorsCacheAt = 0;
+const DOCTORS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function fetchDoctorsCached() {
+  const fresh = doctorsCache && Date.now() - doctorsCacheAt < DOCTORS_CACHE_TTL_MS;
+  if (fresh) return doctorsCache;
+  const { data } = await api.get("/patients/doctors");
+  doctorsCache = data.data;
+  doctorsCacheAt = Date.now();
+  return doctorsCache;
+}
+
 // 1-based position of a queued patient among everyone currently ticked
 // "sent to doctor", ordered by queuedAt (earliest tick = position #1) —
 // mirrors the FIFO order the backend's doctor queue uses.
@@ -34,26 +51,26 @@ export default function ReceptionistPage() {
   const [dateFilter, setDateFilter] = useState(todayInIST());
   const [doctors, setDoctors] = useState([]);
   const [patients, setPatients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Only the very first fetch shows the full "Loading…" table state.
+  // Every fetch after that (date filter change, add-patient reload) uses
+  // `refreshing` instead, so the existing rows stay visible the whole time
+  // — no flash-to-blank, no layout jump, just a small inline spinner.
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedOnce = useRef(false);
   const [saving, setSaving] = useState(false);
 
-  // Which patient is currently selected in the Fees section's search box.
   const [selectedPatientId, setSelectedPatientId] = useState("");
-
-  // Patient ids currently being toggled in/out of the doctor's queue, so the
-  // checkbox can show a brief disabled state instead of double-firing on a
-  // fast double click.
   const [queueTogglingIds, setQueueTogglingIds] = useState(new Set());
 
   useEffect(() => {
-    api
-      .get("/patients/doctors")
-      .then(({ data }) => setDoctors(data.data))
+    fetchDoctorsCached()
+      .then(setDoctors)
       .catch((err) => toast.error(apiErrorMessage(err)));
   }, []);
 
   const loadPatients = useCallback(async () => {
-    setLoading(true);
+    if (hasLoadedOnce.current) setRefreshing(true);
     try {
       const params = {};
       if (dateFilter) params.date = dateFilter;
@@ -62,7 +79,9 @@ export default function ReceptionistPage() {
     } catch (err) {
       toast.error(apiErrorMessage(err));
     } finally {
-      setLoading(false);
+      hasLoadedOnce.current = true;
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   }, [dateFilter]);
 
@@ -101,10 +120,6 @@ export default function ReceptionistPage() {
     }
   }
 
-  // Independent multi-select: any number of patients can be ticked "sent to
-  // doctor" at once. Ticking stamps queuedAt on the backend (now), unticking
-  // clears it — the doctor's queue is ordered by that timestamp, so whoever
-  // gets ticked first is seen first (FIFO).
   async function toggleSentToDoctor(patient, checked) {
     setQueueTogglingIds((prev) => new Set(prev).add(patient.id));
     try {
@@ -227,7 +242,10 @@ export default function ReceptionistPage() {
               <h2 className="font-medium">
                 Patients {dateFilter === todayInIST() ? "— Today" : dateFilter ? `— ${dateFilter}` : "— All dates"}
               </h2>
-              <span className="text-xs text-muted-foreground">{patients.length} record(s)</span>
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                {refreshing && <Loader2 className="h-3 w-3 animate-spin" />}
+                {patients.length} record(s)
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -242,8 +260,16 @@ export default function ReceptionistPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
+                  {initialLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        {Array.from({ length: 6 }).map((__, j) => (
+                          <td key={j} className="py-2.5">
+                            <div className="h-4 rounded bg-muted animate-pulse" style={{ width: `${60 + ((i + j) % 3) * 15}%` }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
                   ) : patients.length === 0 ? (
                     <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">No patients yet</td></tr>
                   ) : (
@@ -300,8 +326,6 @@ function FeesModule({ patients, selectedPatientId, onSelectPatient }) {
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId) ?? null;
 
-  // Keep the search box text in sync whenever the selected patient changes
-  // (e.g. after a fee is collected and the selection is cleared).
   useEffect(() => {
     setSearchText(selectedPatient ? selectedPatient.name : "");
   }, [selectedPatient?.id]);

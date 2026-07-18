@@ -19,7 +19,13 @@ export default function DoctorPage() {
   const navigate = useNavigate();
   const [queue, setQueue] = useState([]);
   const [loadingQueue, setLoadingQueue] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Advancing to the "next patient" now dequeues the current one server-side
+  // (clears queuedAt) instead of just bumping a local array index. That
+  // means the queue itself always reflects who's actually still waiting —
+  // reloading the page, or the receptionist checking someone new in, is
+  // reflected correctly, and the doctor never has to re-click past patients
+  // they already saw before this reload.
+  const [advancing, setAdvancing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editContact, setEditContact] = useState("");
@@ -44,7 +50,7 @@ export default function DoctorPage() {
   const [newItem, setNewItem] = useState({ medicine: "", dosage: "", frequency: "", duration: "", instructions: "" });
   const [viewingReport, setViewingReport] = useState(null);
 
-  const current = queue[currentIndex];
+  const current = queue[0];
 
   const loadQueue = useCallback(async () => {
     setLoadingQueue(true);
@@ -91,8 +97,6 @@ export default function DoctorPage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        // Don't toast-spam if AI just isn't configured (missing AI_API_KEY) —
-        // the panel itself shows a quiet fallback message for that case.
         if (err?.response?.status !== 503) toast.error(apiErrorMessage(err));
       })
       .finally(() => {
@@ -145,6 +149,23 @@ export default function DoctorPage() {
       loadQueue();
     } catch (err) {
       toast.error(apiErrorMessage(err));
+    }
+  }
+
+  // Marks the current patient as seen (clears their queuedAt) and drops
+  // them from the local queue. Because this happens server-side, a page
+  // reload — or the doctor closing the tab and coming back later — always
+  // resumes at whoever is genuinely still waiting, not back at patient #1.
+  async function nextPatient() {
+    if (!current || advancing) return;
+    setAdvancing(true);
+    try {
+      await api.patch(`/patients/${current.id}/queue`, { queued: false });
+      setQueue((prev) => prev.filter((p) => p.id !== current.id));
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setAdvancing(false);
     }
   }
 
@@ -272,12 +293,15 @@ export default function DoctorPage() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setEditing(true)}><Edit3 className="h-4 w-4 mr-1.5" /> Edit</Button>
-            <Button size="sm" onClick={() => setCurrentIndex((i) => Math.min(i + 1, queue.length - 1))}>
+            <Button size="sm" onClick={nextPatient} disabled={advancing || !current}>
+              {advancing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
               Next patient <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground mt-2">Queue: {currentIndex + 1} / {queue.length}</div>
+        <div className="text-xs text-muted-foreground mt-2">
+          {queue.length} patient{queue.length === 1 ? "" : "s"} waiting
+        </div>
       </Card>
 
       <div className="grid lg:grid-cols-[280px_1fr_320px] gap-6">
@@ -403,7 +427,6 @@ export default function DoctorPage() {
 
           <TabsContent value="reports" className="pt-4">
             <div className="grid lg:grid-cols-2 gap-6">
-              {/* Daily reports — one saved consultation per day, each viewable/downloadable independently */}
               <div>
                 <h3 className="font-medium text-sm mb-3">Daily reports</h3>
                 <div className="overflow-x-auto">
@@ -442,7 +465,6 @@ export default function DoctorPage() {
                 </div>
               </div>
 
-              {/* Meeting schedule — sits beside the reports table */}
               <div>
                 <h3 className="font-medium text-sm mb-3">Meeting schedule</h3>
                 <ScheduleMeeting
