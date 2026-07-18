@@ -83,6 +83,9 @@ model Patient {
   fees          Fee[]
 
   @@map("patients")
+
+  @@index([contact])
+  @@index([doctorId, createdAt])
 }
 
 model Consultation {
