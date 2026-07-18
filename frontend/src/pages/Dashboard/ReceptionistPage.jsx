@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileDown, FileSpreadsheet, Printer, Plus, Receipt, Loader2 } from "lucide-react";
+import { FileDown, FileSpreadsheet, Printer, Plus, Receipt, Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { api, apiErrorMessage } from "@/lib/api";
 import { exportToPDF, exportToExcel, printHTML } from "@/lib/export";
 import { todayInIST } from "@/lib/utils";
@@ -28,6 +29,11 @@ export default function ReceptionistPage() {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Lifted up so a checkbox click in the patient table and the search box
+  // in the Fees section stay in sync with each other — one source of truth
+  // for "which patient is currently selected for a fee".
+  const [selectedPatientId, setSelectedPatientId] = useState("");
 
   useEffect(() => {
     api
@@ -54,6 +60,15 @@ export default function ReceptionistPage() {
     loadPatients();
   }, [loadPatients]);
 
+  // If the date filter changes (or the selected patient just isn't in the
+  // list anymore), drop the stale selection rather than silently keeping a
+  // fee form pointed at a patient that's no longer visible.
+  useEffect(() => {
+    if (selectedPatientId && !patients.some((p) => p.id === selectedPatientId)) {
+      setSelectedPatientId("");
+    }
+  }, [patients, selectedPatientId]);
+
   async function addPatient() {
     if (!name.trim()) return toast.error("Name required");
     setSaving(true);
@@ -77,6 +92,12 @@ export default function ReceptionistPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function toggleSelectPatient(patientId, checked) {
+    // Checkbox behaves as a single-select: checking one clears any other,
+    // unchecking the active one clears the selection entirely.
+    setSelectedPatientId(checked ? patientId : "");
   }
 
   const filteredRows = useMemo(
@@ -191,6 +212,7 @@ export default function ReceptionistPage() {
               <table className="w-full text-sm">
                 <thead className="text-left text-muted-foreground text-xs uppercase border-b">
                   <tr>
+                    <th className="py-2 w-8"></th>
                     <th className="py-2">Name</th>
                     <th className="py-2">Doctor</th>
                     <th className="py-2">Condition</th>
@@ -200,12 +222,22 @@ export default function ReceptionistPage() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
+                    <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
                   ) : patients.length === 0 ? (
-                    <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No patients yet</td></tr>
+                    <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">No patients yet</td></tr>
                   ) : (
                     patients.map((p) => (
-                      <tr key={p.id} className="border-b last:border-0 hover:bg-muted/40">
+                      <tr
+                        key={p.id}
+                        className={`border-b last:border-0 hover:bg-muted/40 ${selectedPatientId === p.id ? "bg-primary/5" : ""}`}
+                      >
+                        <td className="py-2">
+                          <Checkbox
+                            checked={selectedPatientId === p.id}
+                            onCheckedChange={(checked) => toggleSelectPatient(p.id, checked)}
+                            aria-label={`Select ${p.name} for fee collection`}
+                          />
+                        </td>
                         <td className="py-2 font-medium">{p.name}</td>
                         <td className="py-2 text-muted-foreground">{p.assignedDoctor?.name ?? "—"}</td>
                         <td className="py-2"><Badge tone={CONDITION_TONE[p.conditionLevel]}>{p.conditionLevel}</Badge></td>
@@ -219,7 +251,7 @@ export default function ReceptionistPage() {
             </div>
           </Card>
 
-          <FeesModule patients={patients} />
+          <FeesModule patients={patients} selectedPatientId={selectedPatientId} onSelectPatient={setSelectedPatientId} />
         </div>
 
         <aside className="space-y-4">
@@ -233,23 +265,60 @@ export default function ReceptionistPage() {
   );
 }
 
-function FeesModule({ patients }) {
-  const [patientId, setPatientId] = useState("");
+function FeesModule({ patients, selectedPatientId, onSelectPatient }) {
+  const [searchText, setSearchText] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("CASH");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const searchBoxRef = useRef(null);
+
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId) ?? null;
+
+  // Keep the search box text in sync when the patient was selected via the
+  // checkbox in the table above, rather than typed here directly.
+  useEffect(() => {
+    setSearchText(selectedPatient ? selectedPatient.name : "");
+  }, [selectedPatient?.id]);
+
+  // Close the results dropdown on outside click.
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setSearchOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const matches = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return patients;
+    return patients.filter(
+      (p) => p.name.toLowerCase().includes(q) || (p.contact ?? "").toLowerCase().includes(q),
+    );
+  }, [patients, searchText]);
+
+  function pickPatient(p) {
+    onSelectPatient(p.id);
+    setSearchText(p.name);
+    setSearchOpen(false);
+  }
+
+  function clearSelection() {
+    onSelectPatient("");
+    setSearchText("");
+  }
 
   async function collect() {
-    const p = patients.find((x) => x.id === patientId);
-    if (!p) return toast.error("Choose a patient");
+    if (!selectedPatient) return toast.error("Search and select a patient first");
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) return toast.error("Invalid amount");
 
     setSaving(true);
     try {
       const { data } = await api.post("/patients/fees", {
-        patientId,
+        patientId: selectedPatient.id,
         amount: amt,
         method,
         description: note || undefined,
@@ -260,7 +329,7 @@ function FeesModule({ patients }) {
         <h1>Receipt</h1>
         <p><strong>${new Date(fee.createdAt).toLocaleString()}</strong></p>
         <table>
-          <tr><th>Patient</th><td>${p.name}</td></tr>
+          <tr><th>Patient</th><td>${selectedPatient.name}</td></tr>
           <tr><th>Amount</th><td>$${Number(fee.amount).toFixed(2)}</td></tr>
           <tr><th>Method</th><td>${fee.method.toUpperCase()}</td></tr>
           ${fee.description ? `<tr><th>Note</th><td>${fee.description}</td></tr>` : ""}
@@ -281,15 +350,56 @@ function FeesModule({ patients }) {
     <Card className="p-5">
       <h2 className="font-medium mb-4 flex items-center gap-2"><Receipt className="h-4 w-4" /> Fees collection</h2>
       <div className="grid md:grid-cols-4 gap-3">
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 relative" ref={searchBoxRef}>
           <Label>Patient</Label>
-          <Select value={patientId} onValueChange={setPatientId}>
-            <SelectTrigger><SelectValue placeholder="Select patient" /></SelectTrigger>
-            <SelectContent>
-              {patients.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-9 pr-8"
+              placeholder="Search today's patients by name or phone…"
+              value={searchText}
+              onFocus={() => setSearchOpen(true)}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+                setSearchOpen(true);
+                if (selectedPatientId) onSelectPatient(""); // typing invalidates the previous pick
+              }}
+            />
+            {searchText && (
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear patient selection"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {searchOpen && (
+            <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-background border rounded-md shadow-lg">
+              {matches.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">No matching patients in this list</div>
+              ) : (
+                matches.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => pickPatient(p)}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/60 flex justify-between items-center ${
+                      p.id === selectedPatientId ? "bg-primary/5 font-medium" : ""
+                    }`}
+                  >
+                    <span>{p.name}</span>
+                    <span className="text-xs text-muted-foreground">{p.contact ?? "—"}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
+
         <div><Label>Amount</Label><Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
         <div>
           <Label>Method</Label>
