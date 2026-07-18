@@ -12,6 +12,10 @@ const createPatientSchema = z.object({
 
 const updatePatientSchema = createPatientSchema.partial();
 
+const setQueueStatusSchema = z.object({
+  queued: z.boolean(),
+});
+
 const collectFeeSchema = z.object({
   patientId: z.string().min(1, "patientId is required"),
   amount: z.coerce.number().positive("Amount must be greater than 0"),
@@ -19,4 +23,10 @@ const collectFeeSchema = z.object({
   description: z.string().trim().optional(),
 });
 
-module.exports = { createPatientSchema, updatePatientSchema, collectFeeSchema, conditionLevelEnum };
+module.exports = {
+  createPatientSchema,
+  updatePatientSchema,
+  setQueueStatusSchema,
+  collectFeeSchema,
+  conditionLevelEnum,
+};

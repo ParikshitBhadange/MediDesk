@@ -9,10 +9,6 @@ async function listPatients({ conditionLevel, search, date }) {
   if (conditionLevel && conditionLevel !== "all") where.conditionLevel = conditionLevel;
   if (search) where.name = { contains: search, mode: "insensitive" };
   if (date) {
-    // date is a "YYYY-MM-DD" string from the receptionist's date picker —
-    // getDayRange interprets that as an IST calendar day (fixed offset),
-    // not the server's own OS timezone, so filtering doesn't silently shift
-    // by several hours depending on where this happens to be deployed.
     const { start, end } = getDayRange(date);
     where.createdAt = { gte: start, lt: end };
   }
@@ -24,25 +20,6 @@ async function listPatients({ conditionLevel, search, date }) {
   });
 }
 
-// Reception re-registers the same real person on a later visit (e.g. a
-// follow-up), often under the exact same name + contact number. Without
-// this check, createPatient would mint a brand-new Patient row every time,
-// and since Consultation/Prescription/Fee/AI-summary all key off patientId,
-// the new row would start with a completely empty history even though the
-// same person was just seen last week.
-//
-// We match on contact number (trimmed, exact) rather than name — names can
-// have typos/variants, but a phone number is the more reliable identifier
-// for "is this the same person". Patients registered without a contact
-// number always get a fresh row, since there's nothing reliable to match on.
-//
-// When a match is found we UPDATE the existing row rather than create a new
-// one, so every past consultation/prescription/fee stays attached to it.
-// createdAt is intentionally refreshed to "now": the doctor's queue
-// (getQueue) and the receptionist's date filter both use Patient.createdAt
-// as an IST calendar-day boundary to decide who shows up in "today's"
-// list — bumping it is what makes a returning patient reappear in today's
-// queue instead of only existing back on their original visit date.
 async function createPatient(data, createdById) {
   const contact = data.contact?.trim() || null;
 
@@ -88,6 +65,21 @@ async function updatePatient(id, data) {
   });
 }
 
+// Ticking the "sent to doctor" checkbox stamps queuedAt with the current
+// time; unticking clears it back to null. Doctor.getQueue orders by this
+// timestamp, so whoever gets ticked first is seen first (FIFO) — not
+// whoever was registered first.
+async function setQueueStatus(id, queued) {
+  const patient = await prisma.patient.findUnique({ where: { id } });
+  if (!patient) throw new ApiError(404, "Patient not found");
+
+  return prisma.patient.update({
+    where: { id },
+    data: { queuedAt: queued ? new Date() : null },
+    include: { assignedDoctor: DOCTOR_SELECT },
+  });
+}
+
 async function deletePatient(id) {
   const patient = await prisma.patient.findUnique({ where: { id } });
   if (!patient) throw new ApiError(404, "Patient not found");
@@ -125,4 +117,13 @@ async function listFees() {
   });
 }
 
-module.exports = { listPatients, createPatient, updatePatient, deletePatient, listDoctors, collectFee, listFees };
+module.exports = {
+  listPatients,
+  createPatient,
+  updatePatient,
+  setQueueStatus,
+  deletePatient,
+  listDoctors,
+  collectFee,
+  listFees,
+};

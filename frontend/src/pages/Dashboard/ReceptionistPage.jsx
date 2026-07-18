@@ -15,6 +15,16 @@ import { todayInIST } from "@/lib/utils";
 
 const CONDITION_TONE = { CRITICAL: "destructive", HIGH: "warning", MEDIUM: "accent", LOW: "success" };
 
+// 1-based position of a queued patient among everyone currently ticked
+// "sent to doctor", ordered by queuedAt (earliest tick = position #1) —
+// mirrors the FIFO order the backend's doctor queue uses.
+function queuePosition(patients, patientId) {
+  const queued = patients
+    .filter((p) => p.queuedAt)
+    .sort((a, b) => new Date(a.queuedAt) - new Date(b.queuedAt));
+  return queued.findIndex((p) => p.id === patientId) + 1;
+}
+
 export default function ReceptionistPage() {
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -34,6 +44,11 @@ export default function ReceptionistPage() {
   // in the Fees section stay in sync with each other — one source of truth
   // for "which patient is currently selected for a fee".
   const [selectedPatientId, setSelectedPatientId] = useState("");
+
+  // Patient ids currently being toggled in/out of the doctor's queue, so the
+  // checkbox can show a brief disabled state instead of double-firing on a
+  // fast double click.
+  const [queueTogglingIds, setQueueTogglingIds] = useState(new Set());
 
   useEffect(() => {
     api
@@ -98,6 +113,27 @@ export default function ReceptionistPage() {
     // Checkbox behaves as a single-select: checking one clears any other,
     // unchecking the active one clears the selection entirely.
     setSelectedPatientId(checked ? patientId : "");
+  }
+
+  // Independent multi-select: any number of patients can be ticked "sent to
+  // doctor" at once. Ticking stamps queuedAt on the backend (now), unticking
+  // clears it — the doctor's queue is ordered by that timestamp, so whoever
+  // gets ticked first is seen first (FIFO), regardless of how many other
+  // patients are also ticked or how long the list is.
+  async function toggleSentToDoctor(patient, checked) {
+    setQueueTogglingIds((prev) => new Set(prev).add(patient.id));
+    try {
+      const { data } = await api.patch(`/patients/${patient.id}/queue`, { queued: checked });
+      setPatients((prev) => prev.map((p) => (p.id === patient.id ? data.data : p)));
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setQueueTogglingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(patient.id);
+        return next;
+      });
+    }
   }
 
   const filteredRows = useMemo(
@@ -212,19 +248,20 @@ export default function ReceptionistPage() {
               <table className="w-full text-sm">
                 <thead className="text-left text-muted-foreground text-xs uppercase border-b">
                   <tr>
-                    <th className="py-2 w-8"></th>
+                    <th className="py-2 w-8" title="Select for fee collection"></th>
                     <th className="py-2">Name</th>
                     <th className="py-2">Doctor</th>
                     <th className="py-2">Condition</th>
                     <th className="py-2">Contact</th>
                     <th className="py-2">Registered</th>
+                    <th className="py-2 whitespace-nowrap">Sent to doctor</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
+                    <tr><td colSpan={7} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
                   ) : patients.length === 0 ? (
-                    <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">No patients yet</td></tr>
+                    <tr><td colSpan={7} className="py-6 text-center text-muted-foreground">No patients yet</td></tr>
                   ) : (
                     patients.map((p) => (
                       <tr
@@ -243,6 +280,19 @@ export default function ReceptionistPage() {
                         <td className="py-2"><Badge tone={CONDITION_TONE[p.conditionLevel]}>{p.conditionLevel}</Badge></td>
                         <td className="py-2 text-muted-foreground">{p.contact ?? "—"}</td>
                         <td className="py-2 text-muted-foreground">{new Date(p.createdAt).toLocaleString()}</td>
+                        <td className="py-2">
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={!!p.queuedAt}
+                              disabled={queueTogglingIds.has(p.id)}
+                              onCheckedChange={(checked) => toggleSentToDoctor(p, checked)}
+                              aria-label={`Mark ${p.name} as sent to doctor`}
+                            />
+                            {p.queuedAt && (
+                              <Badge tone="accent">#{queuePosition(patients, p.id)}</Badge>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}

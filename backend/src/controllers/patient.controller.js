@@ -21,6 +21,17 @@ const update = asyncHandler(async (req, res) => {
   ok(res, patient);
 });
 
+const setQueueStatus = asyncHandler(async (req, res) => {
+  const patient = await patientService.setQueueStatus(req.params.id, req.body.queued);
+  await auditService.logAction({
+    userId: req.user.id,
+    action: req.body.queued ? "SEND_PATIENT_TO_DOCTOR" : "UNSEND_PATIENT_FROM_DOCTOR",
+    entity: "Patient",
+    entityId: patient.id,
+  });
+  ok(res, patient);
+});
+
 const remove = asyncHandler(async (req, res) => {
   await patientService.deletePatient(req.params.id);
   await auditService.logAction({ userId: req.user.id, action: "DELETE_PATIENT", entity: "Patient", entityId: req.params.id });
@@ -43,4 +54,4 @@ const listFees = asyncHandler(async (req, res) => {
   ok(res, fees);
 });
 
-module.exports = { list, create, update, remove, doctors, collectFee, listFees };
+module.exports = { list, create, update, setQueueStatus, remove, doctors, collectFee, listFees };

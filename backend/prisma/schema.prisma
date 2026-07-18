@@ -77,6 +77,12 @@ model Patient {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
+  // Set the moment a receptionist ticks "sent to doctor" for this patient,
+  // cleared (null) when unticked. This — not createdAt — drives the doctor's
+  // queue order, so patients line up First In First Out based on when they
+  // were actually sent in, not when they were registered.
+  queuedAt       DateTime?
+
   consultations Consultation[]
   meetings      Meeting[]
   prescriptions Prescription[]
@@ -86,6 +92,7 @@ model Patient {
 
   @@index([contact])
   @@index([doctorId, createdAt])
+  @@index([doctorId, queuedAt])
 }
 
 model Consultation {

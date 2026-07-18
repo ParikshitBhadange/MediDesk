@@ -2,25 +2,25 @@ const { prisma } = require("../config/db");
 const { ApiError } = require("../utils/ApiError");
 const { getDayRange } = require("../utils/dateRange");
 
-// Doctor's queue: only patients routed to them TODAY (IST calendar day).
-// Without this filter, every patient ever assigned to this doctor — including
-// ones already treated days ago — would sit in the queue forever, since
-// nothing else ever removes a patient from it.
+// Doctor's queue: only patients routed to them TODAY (IST calendar day) AND
+// explicitly ticked "sent to doctor" by reception (queuedAt is set). Without
+// the day filter, every patient ever assigned to this doctor would resurface
+// forever; without the queuedAt filter, patients would show up the instant
+// they're registered instead of when reception actually sends them in.
+//
+// Ordered by queuedAt (not createdAt) so the queue is First In First Out
+// based on when each patient was ticked into the queue — a patient
+// registered earlier but ticked later falls behind one registered later
+// but ticked first.
 async function getQueue(doctorId) {
   const { start, end } = getDayRange();
   return prisma.patient.findMany({
-    where: { doctorId, createdAt: { gte: start, lt: end } },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, contact: true, description: true, conditionLevel: true, createdAt: true },
+    where: { doctorId, queuedAt: { not: null }, createdAt: { gte: start, lt: end } },
+    orderBy: { queuedAt: "asc" },
+    select: { id: true, name: true, contact: true, description: true, conditionLevel: true, createdAt: true, queuedAt: true },
   });
 }
 
-// Finds today's in-progress consultation for a patient, or opens a new one.
-// Using the same IST-fixed day boundary as getQueue keeps "today" consistent
-// everywhere, regardless of what timezone the server itself happens to run in.
-// Only the doctor this patient is CURRENTLY assigned to (or an admin) may
-// open a consultation for them — otherwise any doctor could start editing
-// another doctor's patient by guessing a patient id.
 async function getOrCreateTodayConsultation(patientId, doctorId, role) {
   const patient = await prisma.patient.findUnique({ where: { id: patientId } });
   if (!patient) throw new ApiError(404, "Patient not found");
@@ -76,10 +76,6 @@ async function removePrescriptionItem(id) {
   await prisma.prescriptionItem.delete({ where: { id } });
 }
 
-// "Treated by this doctor" = currently assigned to them, OR they have at
-// least one consultation on record for this patient (covers patients later
-// reassigned to someone else — history should still be visible to whoever
-// actually saw them). Admins can see everyone's records.
 function treatedByCondition(doctorId, role) {
   if (role === "ADMIN") return {};
   return { OR: [{ doctorId }, { consultations: { some: { doctorId } } }] };
@@ -110,9 +106,6 @@ async function getPreviousConsultations(patientId, doctorId, role) {
   });
 }
 
-// Searches every patient this doctor has ever treated — by name, contact
-// number, or the disease recorded on any of their past consultations —
-// for the doctor's "Search patients" page.
 async function searchMyPatients(doctorId, query, role) {
   const q = (query || "").trim();
   const digits = q.replace(/\D/g, "");
@@ -151,9 +144,6 @@ async function searchMyPatients(doctorId, query, role) {
   });
 }
 
-// Patient basics for the doctor's history/detail page — gated by the same
-// "treated by me" rule so one doctor can't browse another's patients by
-// guessing an id in the URL.
 async function getPatientForDoctor(patientId, doctorId, role) {
   const patient = await prisma.patient.findFirst({
     where: { id: patientId, ...treatedByCondition(doctorId, role) },
