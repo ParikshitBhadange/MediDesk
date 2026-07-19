@@ -1,114 +1,161 @@
 # 🏥 MediDesk
 
-MediDesk is an enterprise-grade, full-stack Hospital & Clinic Management Platform designed to streamline operations across medical practitioners, administrative teams, patients, and administrators[span_2](start_span)[span_2](end_span). Powered by a high-performance Node.js REST API backend and a fluid React frontend, it incorporates multi-role access control, automated database migrations, and modern DevOps configurations[span_3](start_span)[span_3](end_span).
+MediDesk is a full-stack hospital & clinic management platform that streamlines patient intake, doctor consultations, prescriptions, and fee collection through three dedicated, role-based workspaces — **Admin**, **Doctor**, and **Receptionist**.
+
+Built with a Node.js/Express REST API on the backend and a React (Vite) frontend, MediDesk features JWT-based authentication, role-based access control (RBAC), an AI-assisted clinical summary/prescription tool, and a fully automated CI/CD pipeline.
+
+🔗 **Live Demo:** https://medidesk-theta.vercel.app
+🔗 **Repository:** https://github.com/ParikshitBhadange/MediDesk
 
 ---
 
 ## 🚀 Key Features
 
-### 🔐 Advanced Authentication & Security
-*   **Role-Based Access Control (RBAC):** Tailored dashboards, route guards, and action permissions for **Admin**, **Doctor**, **Receptionist**, and **Patient** workflows[span_4](start_span)[span_4](end_span).
-*   **Secure Session Management:** Stateless authorization utilizing JSON Web Tokens (JWT) and custom authentication middleware[span_5](start_span)[span_5](end_span).
-*   **Self-Service Recovery:** Multi-factor verification utilizing time-sensitive OTP password reset flows powered by an integrated mailer utility[span_6](start_span)[span_6](end_span).
-*   **Comprehensive Auditing:** Native background ledgering (`audit.service.js`) to capture and trace administrative and medical actions[span_7](start_span)[span_7](end_span).
+### 🔐 Authentication & Access Control
+- **JWT-based authentication** (`jsonwebtoken` + `bcryptjs`) with stateless session handling.
+- **Role-Based Access Control (RBAC)** enforced server-side via custom Express middleware (`requireAuth`, `requireRole`) — not just hidden UI, every route checks permissions independently of the frontend.
+- **Audit logging** (`audit.service.js`) to trace administrative and clinical actions.
 
-### 💼 Specialized Multi-Role Workspaces
-*   **Admin Dashboard:** Complete orchestration over system users, platform configurations, database records, and service auditing[span_8](start_span)[span_8](end_span).
-*   **Doctor Station:** Personalized schedule views, appointment routing, structured medical note compilation, and prescription management[span_9](start_span)[span_9](end_span).
-*   **Receptionist Desk:** Optimized patient onboarding, rapid appointment scheduling, queue management, and front-desk coordination[span_10](start_span)[span_10](end_span).
-*   **Patient Portal:** Self-service registration, medical history tracking, clinical record viewing, and profile maintenance[span_11](start_span)[span_11](end_span).
+### 💼 Role-Based Workspaces
+- **Admin Dashboard** — manage users, system configuration, and review audit logs.
+- **Doctor Station** — view assigned patient queue, record consultations, write prescriptions, and get AI-assisted clinical support.
+- **Receptionist Desk** — patient registration, appointment/meeting scheduling, and fee collection.
 
-### ✨ Extended Tech-Driven Workflows
-*   **AI Service Integration:** Native Hooks (`ai.service.js`) ready to process diagnostic patterns, generate summaries, or handle clinical decision assistance[span_12](start_span)[span_12](end_span).
-*   **Robust Data Reporting:** High-efficiency client-side processing (`export.js`) supporting flat-file data compilation (CSV/JSON summaries) for cross-platform data loading[span_13](start_span)[span_13](end_span).
+### 🤖 AI-Assisted Clinical Support
+- **AI patient summaries** — automatically summarizes a patient's consultation history for the doctor's side panel as soon as the patient is opened.
+- Talks to any **OpenAI-compatible chat-completions endpoint** ( Groq, OpenRouter, local vLLM, etc.) — configurable via `AI_BASE_URL` / `AI_MODEL`, so the provider isn't hardcoded.
+- Fails gracefully: if no API key is configured, the endpoint returns a `503` instead of crashing.
 
----
+### 📊 Data Export
+- Client-side export of records to **CSV, Excel (xlsx), and PDF** (via `jspdf` + `jspdf-autotable`).
 
-## 🛠 Tech Stack & Architecture
-
-### Backend Ecosystem
-*   **Runtime Environment:** Node.js[span_14](start_span)[span_14](end_span)
-*   **API Framework:** Express.js (Modular Route Layout, Centralized Async Handling, Error Cascading)[span_15](start_span)[span_15](end_span)
-*   **Database Mapping:** Prisma ORM[span_16](start_span)[span_16](end_span)
-*   **Database System:** PostgreSQL / MySQL (Configurable via Prisma environment)[span_17](start_span)[span_17](end_span)
-*   **Data Validation Engine:** Schema-driven validation pipelines (`validate.js`)[span_18](start_span)[span_18](end_span)
-
-### Frontend Ecosystem
-*   **Build Utility & Framework:** React.js powered by Vite[span_19](start_span)[span_19](end_span)
-*   **Styling & Design Tokens:** Tailwind CSS Engine with PostCSS configurations[span_20](start_span)[span_20](end_span)
-*   **UI Components:** Shadcn/ui Primitives (Custom Textarea, Select, Tabs, Inputs, Badges, Checkboxes, and Cards)[span_21](start_span)[span_21](end_span)
-*   **State Hydration:** React Context API (`AuthContext`) for unified session state management[span_22](start_span)[span_22](end_span)
-
-### DevOps & Deployment Blueprint
-*   **Container Infrastructure:** Native Multi-Container Docker Deployment (`docker-compose.yml`)[span_23](start_span)[span_23](end_span)
-*   **CI/CD Automation:** Automated GitHub Actions Workflows (`.github/workflows/ci.yml`)[span_24](start_span)[span_24](end_span)
-*   **Cloud Orchestration:** Production configs tailored for Render (`render.yaml`) and Vercel Edge Layout (`vercel.json`)[span_25](start_span)[span_25](end_span)
+### ⚙️ DevOps
+- **CI/CD via GitHub Actions** (`.github/workflows/ci.yml`): lint + build the frontend, validate the Prisma schema, and boot-smoke-test the backend on every push/PR to `main`; auto-deploys to **Render** (backend) and **Vercel** (frontend) on merge.
 
 ---
 
-## 📂 System File Layout
+## 🛠 Tech Stack
+
+**Backend:** Node.js, Express.js, PostgreSQL, Prisma ORM, JWT, Zod (validation), Helmet, express-rate-limit
+**Frontend:** React, Vite, Tailwind CSS, shadcn/ui, React Router, Axios
+**AI:** Groq API (configurable provider/model)
+**DevOps:** GitHub Actions, Render, Vercel
+**Testing:** Jest, Supertest
+
+---
+
+## 📂 Project Structure
 
 ```text
 MediDesk-main/
-├── .github/workflows/ci.yml   # Automated Integration Pipeline
-├── docker-compose.yml          # Multi-Container Application Orchestration
-├── render.yaml                 # Production Environment Deployment Specification
-├── DEPLOYMENT.md               # Advanced Deployment Documentation
+├── .github/workflows/ci.yml     # CI/CD pipeline (lint, build, prisma validate, smoke test, deploy)
+├── render.yaml                  # Render deployment config (backend)
+├── DEPLOYMENT.md                # Deployment guide
 ├── backend/
-│   ├── Dockerfile              # Layer-Optimized Backend Image Setup
-│   ├── server.js               # Network Socket Bootstrapper
+│   ├── server.js                # Entry point
 │   ├── prisma/
-│   │   ├── schema.prisma       # Database Domain Entities Model Map
-│   │   ├── seed.js             # Initial Role/System Seeding Engine
-│   │   └── migrations/         # Relational DB Schema Versions
+│   │   ├── schema.prisma        # 8-entity relational schema
+│   │   ├── seed.js              # Seeds demo accounts + sample data
+│   │   └── migrations/          # Versioned schema migrations
 │   └── src/
-│       ├── app.js              # Application Configurations & Error Catching
-│       ├── controllers/        # Express Endpoints (Admin, Auth, Doctor, Patient)
-│       ├── middleware/         # Auth, Global Error Traps, RBAC, Data Validation
-│       ├── routes/             # Segmented API Router Chains
-│       ├── services/           # Business Engines (AI, Audit Logs, Auth Processing)
-│       ├── utils/              # Responders, Custom Throwables, Mailer Bridges
-│       └── validations/        # Joi/Zod Security Mapping Specifications
+│       ├── app.js               # Express app config, global error handling
+│       ├── controllers/         # admin, auth, doctor, patient
+│       ├── middleware/          # auth, role (RBAC), validate, errorHandler
+│       ├── routes/              # admin, appointment, auth, doctor, patient
+│       ├── services/            # admin, ai, audit, auth, doctor, patient
+│       └── tests/               # Jest/Supertest integration tests
 └── frontend/
-    ├── package.json            # Interface Dependencies & Deployment Tooling
-    ├── tailwind.config.js      # Custom Typography & Semantic Color Matrix
+    ├── tailwind.config.js
     └── src/
-        ├── App.jsx             # Root View Router Port Setup
-        ├── components/         # Protected View UI Wrappers & Layout Atoms
-        ├── context/            # Auth Session Hooks Engine
-        ├── lib/                # API Adapters & Client-side Data Exporters
-        └── pages/              # Composite Layout Modules (Dashboard Views)
+        ├── App.jsx              # Route definitions + role-protected routes
+        ├── context/              # AuthContext (session state)
+        ├── lib/                  # API client, CSV/Excel/PDF export helpers
+        └── pages/
+            ├── Auth/              # Login/register
+            └── Dashboard/         # Admin, Doctor, Receptionist views
+```
+
+---
+
+## 🗄️ Database Schema
+
+Modeled in PostgreSQL via Prisma — 8 entities with foreign-key relations and migration-based versioning:
+
+`User` · `Patient` · `Consultation` · `Meeting` · `Prescription` · `PrescriptionItem` · `Fee` · `AuditLog`
+
+---
+
+## ⚡ Getting Started
+
+### Prerequisites
+- Node.js 20+
+- PostgreSQL 
+
+### 1. Clone
+```bash
+git clone https://github.com/ParikshitBhadange/MediDesk.git
+cd MediDesk
+```
+
+### 2. Backend
+```bash
+cd backend
+npm install
+```
+
+Create `backend/.env`:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/medidesk"
+JWT_SECRET="your-secret-key"
+JWT_EXPIRES_IN="7d"
+CLIENT_ORIGIN="http://localhost:5173"
+PORT=5000
+
+# Optional — AI-assisted summaries/prescriptions
+AI_API_KEY=""
+AI_BASE_URL="https://api.groq.com/openai/v1"
+AI_MODEL="llama-3.3-70b-versatile"
+
+# Optional — email (password reset OTP)
+RESEND_API_KEY=""
+MAIL_FROM="onboarding@resend.dev"
+```
+
+```bash
+npx prisma generate
+npx prisma migrate dev
+npm run seed        # creates demo accounts below
+npm run dev          # http://localhost:5000
 ```
 
 ### 3. Frontend
 ```bash
 cd frontend
-cp .env.example .env        # VITE_API_BASE_URL=http://localhost:5000/api
 npm install
-npm run dev                 # http://localhost:5173
+npm run dev          # http://localhost:5173
 ```
 
 ### Demo accounts (after `npm run seed`)
-| Role         | Email                      | Password      |
-|--------------|----------------------------|----------------|
-| Admin        | admin@hospitalcore.com     | Password123!   |
-| Doctor       | doctor@hospitalcore.com    | Password123!   |
-| Receptionist | reception@hospitalcore.com | Password123!   |
+| Role         | Email                       | Password      |
+|--------------|------------------------------|----------------|
+| Admin        | admin@hospitalcore.com       | Password123!   |
+| Doctor       | doctor@hospitalcore.com      | Password123!   |
+| Receptionist | reception@hospitalcore.com   | Password123!   |
 
-## AI-assisted prescriptions
-The doctor dashboard's "AI Analyse" button calls `POST /api/doctor/analyse`, which forwards
-symptoms/disease/cause to any OpenAI-compatible chat-completions endpoint. Set `AI_API_KEY`
-(and optionally `AI_BASE_URL` / `AI_MODEL`) in `backend/.env` to enable it; without a key the
-endpoint returns a 503 and the button shows a toast instead of crashing the page.
+---
 
-## What changed vs. the Lovable/Supabase version
-- Supabase Auth → JWT auth (`jsonwebtoken` + `bcryptjs`), issued by `/api/auth/login`.
-- Supabase RLS/policies → Express `requireAuth` + `requireRole` middleware.
-- Supabase Postgres functions (`get_my_role`, `has_role`) → plain Prisma queries.
-- Multi-role `user_roles` table → a single `role` enum column on `User` (per the original
-  Prisma draft); switch back to a join table if a user can hold more than one role.
-- `meetings` now has a `status` (PENDING/COMPLETED/CANCELLED), and every relation
-  (`assignedDoctor`, `doctorId` on consultations/meetings/prescriptions, `collectedBy`, etc.)
-  is a real foreign key — both gaps identified when the two original schemas were compared.
-- FullCalendar → a plain sortable table of upcoming meetings, to avoid a heavy calendar
-  dependency; swap back in easily if a visual calendar is needed later.
+## 🧪 Testing
+
+```bash
+cd backend
+npm test              # Jest + Supertest integration suite
+npm run test:coverage
+```
+
+## 📦 Deployment
+
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full guide. In short: backend deploys to **Render** (`render.yaml`), frontend deploys to **Vercel**, and both are triggered automatically by the GitHub Actions workflow on every push to `main`.
+
+## 📄 License
+
+This project is available for educational and portfolio purposes.
