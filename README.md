@@ -37,9 +37,13 @@ Built with a Node.js/Express REST API on the backend and a React (Vite) frontend
 ## 🛠 Tech Stack
 
 **Backend:** Node.js, Express.js, PostgreSQL, Prisma ORM, JWT, Zod (validation), Helmet, express-rate-limit
+
 **Frontend:** React, Vite, Tailwind CSS, shadcn/ui, React Router, Axios
+
 **AI:** Groq API (configurable provider/model)
+
 **DevOps:** GitHub Actions, Render, Vercel
+
 **Testing:** Jest, Supertest
 
 ---
